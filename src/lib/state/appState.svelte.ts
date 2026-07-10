@@ -1,19 +1,31 @@
 import { browser } from '$app/environment';
 import { DEFAULT_PORTFOLIO } from '../engine/presets';
-import type { FinderConfig, Holding, PortfolioData } from '../engine/types';
+import type { DecisionRecord, FinderConfig, Holding, PortfolioData, WatchlistItem } from '../engine/types';
+import type { BrokerProfileId } from '../engine/marginProfile';
+import { DEFAULT_PROFILE_ID, getProfile } from '../engine/marginProfile';
+import { DEFAULT_COLLATERAL_RATE } from '../engine/config';
+import { createLocalAppStateRepository, type AppStateShape, type WorkingTrade } from './portfolioRepository';
 
 export type Theme = 'light' | 'dark';
 
-export interface PendingTrade {
-  ticker: string;
-  shares: number;
-}
+/**
+ * Geçici "in-flight" mesaj şemasının yerini "working draft" aldı:
+ * kullanıcı bir ticker/shares/additionalCash/holdingDays kombinasyonu
+ * planladığında burada yaşar; Simulator yazar, Scenarios + DecisionStrip +
+ * MarginCallMap okur. #d= base64 payload'ında da taşınır (Share için).
+ */
+export type { WorkingTrade };
 
 interface PersistShape {
   p: PortfolioData;
   s: string;
   f: FinderConfig;
   g: boolean;
+  d: DecisionRecord[];
+  w: WatchlistItem[];
+  pr: BrokerProfileId;
+  t: WorkingTrade | null;
+  e: Record<number, boolean>;
 }
 
 function loadTheme(): Theme {
@@ -26,6 +38,8 @@ function loadTheme(): Theme {
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
+
+const repo = createLocalAppStateRepository();
 
 export const app = $state({
   portfolio: clone(DEFAULT_PORTFOLIO) as PortfolioData,
@@ -40,8 +54,31 @@ export const app = $state({
   } as FinderConfig,
   guided: true,
   theme: loadTheme(),
-  pendingTrade: null as PendingTrade | null
+  currentTrade: null as WorkingTrade | null,
+  decisionLog: [] as DecisionRecord[],
+  watchlist: [] as WatchlistItem[],
+  profile: DEFAULT_PROFILE_ID as BrokerProfileId,
+  eduDone: {} as Record<number, boolean>,
+  /** true olduğunda UI küçük bir uyarı gösterebilir (örn. ayarlar sıfırlandı). */
+  persistenceError: false
 });
+
+/**
+ * Aktif profil = settings.activeProfileId (tek kaynak).
+ * Eski `app.profile` okumaları için geriye dönük uyumluluk sağlar;
+ * yazma işlemleri settingsStore.setActiveProfile üzerinden yapılır.
+ */
+export function getActiveProfile(): BrokerProfileId {
+  return app.profile;
+}
+
+/**
+ * @deprecated app.profile artık tek kaynak değil. settingsStore.setActiveProfile kullanın.
+ * Geriye dönük uyumluluk için bırakıldı.
+ */
+export function setProfile(id: BrokerProfileId) {
+  app.profile = id;
+}
 
 export function setTheme(t: Theme) {
   app.theme = t;
@@ -75,6 +112,30 @@ export function updateHolding(index: number, patch: Partial<Holding>) {
   if (app.portfolio.holdings[index]) Object.assign(app.portfolio.holdings[index], patch);
 }
 
+/** Kullanıcı bir pozisyonun teminat oranını override eder → kaynak 'user-override'. */
+export function setHoldingCollateral(index: number, rate: number) {
+  const h = app.portfolio.holdings[index];
+  if (!h) return;
+  h.collateral = Math.max(0, Math.min(1, rate));
+  h.collateralSource = 'user-override';
+}
+
+/** Override'ı sıfırla → varsayımsal %75. */
+export function resetHoldingCollateral(index: number) {
+  const h = app.portfolio.holdings[index];
+  if (!h) return;
+  h.collateral = DEFAULT_COLLATERAL_RATE;
+  h.collateralSource = 'default-assumption';
+  h.excludeFromCollateral = false;
+}
+
+/** Gelişmiş Varsayımlar: pozisyonu collateral havuzundan hariç tut / dahil et. */
+export function toggleExcludeCollateral(index: number) {
+  const h = app.portfolio.holdings[index];
+  if (!h) return;
+  h.excludeFromCollateral = !h.excludeFromCollateral;
+}
+
 export function removeHolding(index: number) {
   app.portfolio.holdings.splice(index, 1);
 }
@@ -99,39 +160,140 @@ export function resetPortfolio() {
   app.portfolio = clone(DEFAULT_PORTFOLIO);
 }
 
-export function setPendingTrade(t: PendingTrade | null) {
-  app.pendingTrade = t;
+/** Kullanıcının üzerinde çalıştığı trade taslağı. Simulator yazar, diğerleri okur. */
+export function setCurrentTrade(t: WorkingTrade | null) {
+  app.currentTrade = t;
 }
 
-function serialize(): string {
-  const shape: PersistShape = {
-    p: app.portfolio,
-    s: app.activeScenario,
-    f: app.finder,
-    g: app.guided
+export function clearCurrentTrade() {
+  app.currentTrade = null;
+}
+
+export function setPendingTrade(t: { ticker: string; shares: number } | null) {
+  if (!t) {
+    app.currentTrade = null;
+    return;
+  }
+  app.currentTrade = {
+    ticker: t.ticker,
+    shares: t.shares,
+    additionalCash: 0,
+    holdingDays: 30,
+    updatedAt: new Date().toISOString()
   };
-  return btoa(encodeURIComponent(JSON.stringify(shape)));
 }
 
-export function hydrateFromHash() {
-  if (!browser) return;
-  const hash = location.hash;
-  const m = hash.match(/#d=([^&]+)/);
-  if (!m) return;
-  try {
-    const json = decodeURIComponent(atob(m[1]));
-    const shape = JSON.parse(json) as PersistShape;
-    if (shape.p) app.portfolio = shape.p;
-    if (shape.s) app.activeScenario = shape.s;
-    if (shape.f) Object.assign(app.finder, shape.f);
-    if (typeof shape.g === 'boolean') app.guided = shape.g;
-  } catch {
-    // bozuk hash — yok say
+/** Education step durumu: kalıcı, navigation arası yaşar. */
+export function setEduDone(n: number, v: boolean) {
+  if (v) app.eduDone[n] = true;
+  else delete app.eduDone[n];
+}
+
+export function setPendingDecision(_ignored: never) {
+  // Eski API: uyumluluk için no-op. Yeni kayıtlar addDecision üzerinden.
+}
+
+export function addDecision(r: DecisionRecord) {
+  app.decisionLog = [r, ...app.decisionLog].slice(0, 20);
+}
+
+export function toggleWatchlist(ticker: string) {
+  const idx = app.watchlist.findIndex((w) => w.ticker === ticker);
+  if (idx >= 0) {
+    app.watchlist.splice(idx, 1);
+  } else {
+    app.watchlist.push({ ticker, addedAt: new Date().toISOString() });
   }
 }
 
-export function syncHash() {
+export function isInWatchlist(ticker: string): boolean {
+  return app.watchlist.some((w) => w.ticker === ticker);
+}
+
+function toPersistShape(): PersistShape {
+  return {
+    p: app.portfolio,
+    s: app.activeScenario,
+    f: app.finder,
+    g: app.guided,
+    d: app.decisionLog,
+    w: app.watchlist,
+    pr: app.profile,
+    t: app.currentTrade,
+    e: app.eduDone
+  };
+}
+
+function applyShape(shape: PersistShape) {
+  if (shape.p) app.portfolio = shape.p;
+  if (shape.s) app.activeScenario = shape.s;
+  if (shape.f) Object.assign(app.finder, shape.f);
+  if (typeof shape.g === 'boolean') app.guided = shape.g;
+  if (Array.isArray(shape.d)) app.decisionLog = shape.d;
+  if (Array.isArray(shape.w)) app.watchlist = shape.w;
+  if (shape.t && typeof shape.t === 'object') app.currentTrade = shape.t;
+  if (shape.e && typeof shape.e === 'object') app.eduDone = shape.e as Record<number, boolean>;
+  app.profile = getProfile(shape.pr).id;
+}
+
+/**
+ * localStorage'dan state'i yükler. Eski `#d=` URL hash'i varsa onu bir kerelik
+ * import eder, localStorage'a yazar, hash'i temizler (geriye dönük uyumluluk).
+ */
+export function hydrateFromStorage() {
   if (!browser) return;
-  const next = '#d=' + serialize();
-  if (location.hash !== next) history.replaceState(null, '', next);
+  const stored = repo.load();
+  applyShape(stored as PersistShape);
+
+  // Eski URL hash migration: kullanıcı #d=... ile geldiyse state'i içeri al,
+  // localStorage'a yaz ve hash'i temizle. Sonraki reload localStorage'dan gelir.
+  const hash = location.hash;
+  const m = hash.match(/#d=([^&]+)/);
+  if (m) {
+    try {
+      const json = decodeURIComponent(atob(m[1]));
+      const shape = JSON.parse(json) as PersistShape;
+      applyShape(shape);
+      repo.save(toPersistShape());
+    } catch {
+      // bozuk hash — yok say
+    }
+    // Hash'i temizle; path değişmediği için SvelteKit router yeniden koşmaz.
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+}
+
+/**
+ * Share URL üretir. setCurrentTrade + setFinder + ... yapan mutator'ların state'i
+ * serialize eder, `#d=` payload'ı olarak base64 JSON'a çevirir. URL temiz kalır
+ * (otomatik yazılmaz) — paylaşım yalnızca explicit bu fonksiyon çağrıldığında.
+ */
+export function buildShareUrl(): string {
+  return location.origin + location.pathname + location.search + '#d=' + btoa(encodeURIComponent(JSON.stringify(toPersistShape())));
+}
+
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * State değişikliklerini localStorage'a yazar. 250ms debounce — UI
+ * akışını bloklamamak ve aynı render frame'inde birden çok write'ı
+ * birleştirmek için.
+ */
+export function syncStorage() {
+  if (!browser) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    const ok = repo.save(toPersistShape());
+    if (!ok) app.persistenceError = true;
+    syncTimer = null;
+  }, 250);
+}
+
+/** Eski hash API; yeni kod `syncStorage` çağırmalı. Geriye dönük uyumluluk için bırakıldı. */
+export function syncHash() {
+  syncStorage();
+}
+
+export function hydrateFromHash() {
+  hydrateFromStorage();
 }

@@ -49,7 +49,7 @@ Mobil için kayan drawer (`translateX`), backdrop tıklama/ESC ile kapanır. Sid
 | `WarningBox.svelte` | 3 seviyeli uyarı kutusu (success/warning/danger/neutral) |
 | `Button.svelte` | `primary/secondary/ghost` hiyerarşili buton |
 | `RangeSlider.svelte` | Dinamik değer etiketli kaydırıcı (margin/faiz/gün) |
-| `Modal.svelte` | Genel modal: ESC/backdrop kapanır, scroll lock |
+| `Modal.svelte` | Genel modal: ESC/backdrop kapanır, scroll lock, başlık 2 satır (eyebrow üstte, başlık altta) |
 | `PageHeader.svelte` | Sayfa başlığı: eyebrow + H1 + açıklama + aksiyonlar |
 | `GuidedNote.svelte` | Yalnızca `app.guided` açıkken görünen eğitsel not |
 
@@ -84,6 +84,20 @@ Halka grafik + legend. `data: { label, value, color }[]`.
 ## `ConceptModal.svelte`
 `conceptStore`′ı dinler; açıkken `concepts.ts`′ten ilgili kavramı Modal içinde gösterir
 (tanım + "üründe kullanımı" notu).
+
+---
+
+## `ui/Modal.svelte`
+Tüm modalların (ConceptModal dahil) temelini oluşturur. Props: `open`, `eyebrow?`, `title`,
+`onclose`, `wide?`, `children` (snippet).
+
+**Başlık düzeni (eyebrow + title):** Modal başlığı iki satırlıdır; üst satırda `eyebrow`
+(`CONCEPT NOTE`, `ASSUMPTIONS` vb.), alt satırda `<h3>` başlık yer alır. Bunu sağlayan CSS,
+`.head` üzerindeki `flex-wrap: wrap` ve `.head .eyebrow { flex-basis: 100%; }` kurallarıdır;
+eyebrow satırı tam genişliğe zorlanır, başlık bir sonraki satıra sarar. Bu sayede konu başlığı
+(CONCEPT NOTE gibi) görsel olarak ayrışır ve başlık kendi satırında okunabilir kalır.
+A11y: `aria-label={title}` dialog'a uygulanır; ESC, backdrop tıklama ve Tab tuzağı desteklenir;
+açılışta ilk focusable'a focus verilir, kapanışta tetikleyen elemana geri dönülür.
 
 ---
 

@@ -1,35 +1,35 @@
 <script lang="ts">
-  import { app, toggleTheme, setGuided } from '../../state/appState.svelte';
+  import { app, toggleTheme } from '../../state/appState.svelte';
   import Icon from '../icons/Icon.svelte';
+  import LanguageMenu from './LanguageMenu.svelte';
+  import ShareButton from './ShareButton.svelte';
+  import { t } from '$lib/i18n';
 
   let { onmenu }: { onmenu: () => void } = $props();
 </script>
 
 <header class="topbar">
   <div class="left">
-    <button class="menu" onclick={onmenu} aria-label="Menü"><Icon name="menu" size={20} /></button>
+    <button class="menu" onclick={onmenu} aria-label={t('topbarMenu')}><Icon name="menu" size={20} /></button>
     <a href="/" class="brand">
       <span class="mark">M</span>
       <span class="brand-text">
-        MarginCall
-        <span class="sub">Portföy Risk Karar Stüdyosu</span>
+        MarginLab
+        <span class="sub">{t('topbarBrandSub')}</span>
       </span>
     </a>
   </div>
-  <div class="actions">
+  <div class="utility" role="toolbar" aria-label={t('topbarLang')}>
+    <LanguageMenu />
+    <ShareButton />
     <button
+      type="button"
       class="icon-btn"
-      class:on={app.guided}
-      onclick={() => setGuided(!app.guided)}
-      aria-label="Rehber modu"
-      title="Rehber modu"
+      onclick={toggleTheme}
+      aria-label={app.theme === 'dark' ? t('themeLight') : t('themeDark')}
+      title={app.theme === 'dark' ? t('themeLight') : t('themeDark')}
     >
-      <Icon name="book" size={18} />
-      <span class="sr-only">Rehber</span>
-    </button>
-    <button class="icon-btn" onclick={toggleTheme} aria-label="Tema değiştir">
       <Icon name={app.theme === 'dark' ? 'sun' : 'moon'} size={18} />
-      <span class="sr-only">Tema</span>
     </button>
   </div>
 </header>
@@ -95,6 +95,11 @@
     color: var(--faint);
     letter-spacing: 0.02em;
   }
+  .utility {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
   .icon-btn {
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -106,19 +111,10 @@
     cursor: pointer;
     color: var(--text);
   }
-  .icon-btn.on {
-    background: var(--text);
-    color: var(--inverse);
-    border-color: var(--text);
+  .icon-btn:hover {
+    background: var(--surface-3);
   }
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-  }
-  @media (max-width: 960px) {
+  @media (max-width: 1180px) {
     .menu {
       display: grid;
     }

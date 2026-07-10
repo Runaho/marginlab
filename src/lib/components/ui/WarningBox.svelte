@@ -5,12 +5,14 @@
     title,
     detail,
     level = 'neutral',
-    icon
+    icon,
+    actions
   }: {
     title: string;
     detail: string;
     level?: 'success' | 'warning' | 'danger' | 'safe' | 'neutral';
     icon?: string;
+    actions?: import('svelte').Snippet;
   } = $props();
 
   const icons = {
@@ -24,11 +26,12 @@
 
 <div class="warn warn-{level}">
   <span class="wicon"><Icon name={icon ?? icons[level]} size={18} /></span>
-  <div class="body">
-    <div class="title">{title}</div>
-    <div class="detail">{detail}</div>
+    <div class="body">
+      <div class="title">{title}</div>
+      <div class="detail">{detail}</div>
+      {#if actions}<div class="actions">{@render actions()}</div>{/if}
+    </div>
   </div>
-</div>
 
 <style>
   .warn {
@@ -49,36 +52,52 @@
   }
   .detail {
     font-size: 13px;
-    color: var(--muted);
+    /* Kritik risk metni düşük kontrastlı olmamalı — okunur gövde rengi */
+    color: var(--text);
     margin-top: 2px;
     line-height: 1.45;
   }
-  .warn-success {
-    background: color-mix(in srgb, var(--success) 12%, transparent);
-    border-color: color-mix(in srgb, var(--success) 30%, transparent);
-    color: var(--success);
-  }
+  /* Semantic token'lar: pozitif/attention/critical/info — WCAG hedefli fg */
+  .warn-success,
   .warn-safe {
-    background: color-mix(in srgb, var(--success) 12%, transparent);
-    border-color: color-mix(in srgb, var(--success) 30%, transparent);
-    color: var(--success);
+    background: var(--positive-bg);
+    border-color: var(--positive-border);
+    color: var(--positive-fg);
   }
   .warn-warning {
-    background: color-mix(in srgb, var(--warning) 14%, transparent);
-    border-color: color-mix(in srgb, var(--warning) 32%, transparent);
-    color: var(--warning);
+    background: var(--attention-bg);
+    border-color: var(--attention-border);
+    color: var(--attention-fg);
   }
   .warn-danger {
-    background: color-mix(in srgb, var(--danger) 12%, transparent);
-    border-color: color-mix(in srgb, var(--danger) 32%, transparent);
-    color: var(--danger);
+    background: var(--critical-bg);
+    border-color: var(--critical-border);
+    color: var(--critical-fg);
   }
   .warn-neutral {
-    background: var(--surface-2);
-    border-color: var(--border);
+    background: var(--neutral-bg);
+    border-color: var(--neutral-border);
     color: var(--text);
   }
-  .warn-neutral .detail {
-    color: var(--muted);
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+  .actions :global(a),
+  .actions :global(button) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    font-weight: 600;
+    font-size: 13px;
+    text-decoration: none;
+    cursor: pointer;
   }
 </style>

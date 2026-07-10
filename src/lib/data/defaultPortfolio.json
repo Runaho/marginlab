@@ -1,4 +1,4 @@
-{
+﻿{
   "cash": 45.16,
   "account": {
     "initialMargin": 0.5,
@@ -14,6 +14,7 @@
       "cost": 62.95,
       "beta": 1.1,
       "collateral": 0.75,
+      "collateralSource": "default-assumption",
       "sector": "Teknoloji"
     },
     {
@@ -24,6 +25,7 @@
       "cost": 23.29,
       "beta": 1.2,
       "collateral": 0.75,
+      "collateralSource": "default-assumption",
       "sector": "Finans"
     },
     {
@@ -34,6 +36,7 @@
       "cost": 16.88,
       "beta": 0.9,
       "collateral": 0.75,
+      "collateralSource": "default-assumption",
       "sector": "Finans"
     },
     {
@@ -44,6 +47,7 @@
       "cost": 69.48,
       "beta": 1.6,
       "collateral": 0.75,
+      "collateralSource": "default-assumption",
       "sector": "Teknoloji"
     }
   ]

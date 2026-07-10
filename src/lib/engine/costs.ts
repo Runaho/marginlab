@@ -1,13 +1,20 @@
 import type { CostBreakdown } from './types';
+import type { CostModel } from './settings/types';
+import { costLabel } from '$lib/i18n/labels';
 
-const COMMISSION_RATE = 0.0025; // %0.25
-const COMMISSION_MIN = 1.0; // min 1 USD
-const HALF_SPREAD = 0.005; // tick 0.01 => yarım spread 0.005
-const SEC_FEE_RATE = 0.0000206; // satış tarafı %0.00206
-const CUSTODY_RATE = 0.0005; // yıllık %0.05
-
-export function commission(notional: number): number {
-  return Math.max(notional * COMMISSION_RATE, COMMISSION_MIN);
+export function commission(notional: number, model: CostModel): number {
+  const { commissionModel, commissionRate, commissionMin, commissionPerShare } = model;
+  switch (commissionModel) {
+    case 'per-share':
+      return Math.max(model.commissionPerShare, commissionMin);
+    case 'fixed':
+      return commissionMin;
+    case 'none':
+      return 0;
+    case 'percentage':
+    default:
+      return Math.max(notional * commissionRate, commissionMin);
+  }
 }
 
 export function computeCosts(input: {
@@ -16,24 +23,28 @@ export function computeCosts(input: {
   borrow: number;
   holdingDays: number;
   rate: number;
+  costModel: CostModel;
 }): CostBreakdown {
+  const { commissionRate, commissionMin, commissionPerShare, spreadRate, secFeeRate, custodyRate, commissionModel } = input.costModel;
   const notional = input.shares * input.price;
-  const openCommission = commission(notional);
-  const closeCommission = commission(notional);
-  const spread = input.shares * HALF_SPREAD * 2;
-  const secFee = notional * SEC_FEE_RATE;
-  const custody = notional * CUSTODY_RATE * (input.holdingDays / 365);
+
+  const openCommission = commission(notional, input.costModel);
+  const closeCommission = commission(notional, input.costModel);
+  const spread = input.shares * (input.price * spreadRate);
+  const secFee = notional * secFeeRate;
+  const custody = notional * custodyRate * (input.holdingDays / 365);
   const interest = input.borrow * input.rate * (input.holdingDays / 365);
+
   const total = openCommission + closeCommission + spread + secFee + custody + interest;
   return { openCommission, closeCommission, spread, secFee, custody, interest, total };
 }
 
 export const COST_LABELS: Record<keyof CostBreakdown, string> = {
-  openCommission: 'Açılış komisyonu',
-  closeCommission: 'Kapanış komisyonu',
-  spread: 'Spread (alış-satış farkı)',
-  secFee: 'SEC işlem ücreti (satış)',
-  custody: 'Saklama ücreti (pro-rate)',
-  interest: 'Margin faizi (taşıma maliyeti)',
-  total: 'Toplam maliyet'
+  openCommission: 'costOpenCommission',
+  closeCommission: 'costCloseCommission',
+  spread: 'costSpread',
+  secFee: 'costSecFee',
+  custody: 'costCustody',
+  interest: 'costInterest',
+  total: 'costTotal'
 };

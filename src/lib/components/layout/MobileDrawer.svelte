@@ -2,26 +2,75 @@
   import { app, toggleTheme } from '../../state/appState.svelte';
   import Icon from '../icons/Icon.svelte';
   import Sidebar from './Sidebar.svelte';
+  import { t } from '$lib/i18n';
+  import { onMount } from 'svelte';
 
   let { open, onclose }: { open: boolean; onclose: () => void } = $props();
+
+let drawerEl: HTMLElement | null = $state(null);
+let lastFocused: HTMLElement | null = $state(null);
+
+  function trapFocus(e: KeyboardEvent) {
+    if (!drawerEl) return;
+    const focusable = drawerEl.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.key === 'Tab') {
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onclose();
+    } else if (e.key === 'Tab') {
+      trapFocus(e);
+    }
+  }
+
+  $effect(() => {
+    if (open) {
+      lastFocused = document.activeElement as HTMLElement;
+      document.body.style.overflow = 'hidden';
+      onMount(() => {
+      (drawerEl as HTMLElement | null)?.focus();
+      document.addEventListener('keydown', onKeyDown);
+      return () => {
+        document.removeEventListener('keydown', onKeyDown);
+        document.body.style.overflow = '';
+        lastFocused?.focus();
+      };
+    });
+    }
+  });
 </script>
 
 {#if open}
   <div class="backdrop" onclick={onclose} role="presentation"></div>
-  <aside class="drawer" aria-label="Gezinme">
+  <div class="drawer" bind:this={drawerEl} role="dialog" aria-modal="true" aria-label={t('drawerNav')} tabindex="-1">
     <div class="drawer-head">
       <div class="brand">
         <span class="mark">M</span>
-        <span class="brand-text">MarginCall <span class="sub">/ Gezinme</span></span>
+        <span class="brand-text">MarginLab <span class="sub">/ {t('drawerNav')}</span></span>
       </div>
-      <button class="x" onclick={onclose} aria-label="Kapat"><Icon name="x" size={18} /></button>
+      <button class="x" onclick={onclose} aria-label={t('commonClose')}><Icon name="x" size={18} /></button>
     </div>
     <Sidebar onnav={onclose} />
-    <button class="theme-btn" onclick={toggleTheme}>
+    <button class="theme-btn" onclick={toggleTheme} aria-label={app.theme === 'dark' ? t('themeLight') : t('themeDark')}>
       <Icon name={app.theme === 'dark' ? 'sun' : 'moon'} size={18} />
-      {app.theme === 'dark' ? 'Açık tema' : 'Koyu tema'}
+      <span>{app.theme === 'dark' ? t('themeLight') : t('themeDark')}</span>
     </button>
-  </aside>
+  </div>
 {/if}
 
 <style>

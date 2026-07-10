@@ -1,12 +1,12 @@
-# MarginCall — Proje Dokümantasyonu
+# MarginLab — Proje Dokümantasyonu
 
-**MarginCall**, portföy destekli bir *margin (kaldıraç) karar stüdyosudur*. Bireysel yatırımcının,
+**MarginLab**, portföy destekli bir *margin (kaldıraç) karar stüdyosudur*. Bireysel yatırımcının,
 bir trade′i margin ile açmadan önce **maliyetini, riskini ve portföyün taşıyıp taşıyamayacağını**
 anlamasını sağlar. Bir hesap makinesi değil; açıklar‑sonra‑hesaplar yaklaşımına dayalı, eğitim
 odaklı bir araçtır.
 
-> Marka: dökümanlardaki orijinal "MarginLab" ürünü, bu projede **MarginCall** adıyla hayata
-> geçirilmiştir. Motor mantığı ve editorial‑monochrome tasarım sistemi aynen korunmuştur.
+> Marka: proje kod içi ve paket adı "marginlab" olarak taşınır; kullanıcı arayüzünde **MarginLab**
+> olarak görünür. Motor mantığı ve editorial‑monochrome tasarım sistemi aynen korunmuştur.
 
 ---
 

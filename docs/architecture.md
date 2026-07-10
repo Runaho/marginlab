@@ -1,6 +1,6 @@
 # Mimari (Architecture)
 
-MarginCall, **katmanlı** bir yapıya sahiptir. Her katman yalnızca altındaki katmanı bilir; böylece
+MarginLab, **katmanlı** bir yapıya sahiptir. Her katman yalnızca altındaki katmanı bilir; böylece
 hesaplama mantığı UI′dan tamamen ayrışır ve birim test edilebilir kalır.
 
 ```

@@ -1,20 +1,32 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { app, setFinder, setPendingTrade } from '$lib/state/appState.svelte';
-  import { portfolioStats } from '$lib/engine/portfolio';
+  import { app, setFinder, setCurrentTrade, addDecision } from '$lib/state/appState.svelte';
+  import { settings, getActiveProfileId } from '$lib/engine/settings/settingsStore.svelte';
+  import { selectAccount } from '$lib/engine/selectors/selectAccount';
+  import { resolveProfile } from '$lib/engine/account/settingsResolver';
   import { runFinder } from '$lib/engine/finder';
   import { SCENARIOS } from '$lib/engine/presets';
-  import { marketUniverse } from '$lib/engine/market';
-  import type { FinderCandidate, FinderConfig, FinderMode, ScenarioScope } from '$lib/engine/types';
+  import { allInstruments } from '$lib/engine/market';
+
+  const profile = $derived(resolveProfile(settings, getActiveProfileId()));
+  import type { FinderCandidate, FinderConfig, FinderMode, ScenarioScope, Holding } from '$lib/engine/types';
   import { fmtMoney, fmtPct, fmtShares } from '$lib/utils/format';
-  import { levelLabel } from '$lib/utils/format';
+  import { t } from '$lib/i18n';
+  import { sectorLabel } from '$lib/i18n/labels';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
   import Button from '$lib/components/ui/Button.svelte';
   import GuidedNote from '$lib/components/ui/GuidedNote.svelte';
-  import Icon from '$lib/components/icons/Icon.svelte';
+  import Modal from '$lib/components/ui/Modal.svelte';
 
-  const stats = $derived(portfolioStats(app.portfolio));
+  const stats = $derived(
+    selectAccount({
+      cash: app.portfolio.cash,
+      holdings: app.portfolio.holdings,
+      profileId: getActiveProfileId(),
+      settings
+    })
+  );
 
   let applied = $state<FinderConfig>({ ...app.finder });
 
@@ -23,82 +35,231 @@
   }
 
   const ctx = $derived({
-    availableCollateral: stats.availableCollateral,
-    account: app.portfolio.account,
+    availableFunds: stats.collateral.availableFunds,
+    account: stats.account,
     budget: applied.budget,
-    sectorWeights: stats.sectorWeights
+    sectorWeights: stats.sectorWeights,
+    costModel: settings.costModel,
+    universe: allInstruments(app.portfolio.holdings, app.watchlist).map((i) => ({
+      ticker: i.ticker,
+      name: i.name,
+      shares: 1,
+      price: i.price,
+      cost: i.price,
+      beta: i.beta,
+      collateral: profile.defaultEligibleEquityRate,
+      sector: i.sector
+    }))
   });
 
   const result = $derived(runFinder(applied, SCENARIOS, app.activeScenario, ctx));
   const universeNames = $derived(
-    Object.fromEntries(marketUniverse().map((u) => [u.ticker, u.name]))
+    Object.fromEntries(ctx.universe.map((u) => [u.ticker, u.name]))
   );
 
-  let expanded = $state<string | null>(null);
-  function toggle(t: string) {
-    expanded = expanded === t ? null : t;
+  let preview = $state<FinderCandidate | null>(null);
+  let inspectOpen = $state(false);
+  let inspectSearch = $state('');
+  let inspectOnlyInsufficient = $state(false);
+  let inspectSort = $state<'ticker' | 'value' | 'resilience'>('ticker');
+
+  const previewData = $derived.by(() => {
+    if (!preview) return null;
+    const before = stats;
+    const projHoldings: Holding[] = [
+      ...app.portfolio.holdings,
+      {
+        ticker: preview.ticker,
+        name: preview.name,
+        shares: preview.shares,
+        price: preview.price,
+        cost: preview.price,
+        beta: preview.beta,
+        collateral: profile.defaultEligibleEquityRate,
+        collateralSource: 'default-assumption',
+        sector: preview.sector
+      }
+    ];
+    const after = selectAccount({
+      cash: app.portfolio.cash,
+      holdings: projHoldings,
+      profileId: getActiveProfileId(),
+      settings
+    });
+    return { before, after };
+  });
+
+  // Tüm enstrüman listesi; her biri için: ticker, name, price, eligible, topScore (varsa)
+  interface InspectRow {
+    ticker: string;
+    name: string;
+    price: number;
+    eligible: boolean;
+    topScore: number | null;
+    topResilience: number | null;
+    topResilienceTotal: number | null;
+    topShares: number | null;
+    reason: 'no-data' | 'no-budget' | 'no-eligibility' | 'calculated';
   }
+  const inspectRows = $derived.by<InspectRow[]>(() => {
+    const candidatesByTicker = new Map<string, FinderCandidate[]>();
+    for (const c of [...result.global, ...Object.values(result.perStock).flat()]) {
+      const arr = candidatesByTicker.get(c.ticker) ?? [];
+      arr.push(c);
+      candidatesByTicker.set(c.ticker, arr);
+    }
+    return ctx.universe.map((u) => {
+      const cands = candidatesByTicker.get(u.ticker) ?? [];
+      const best = cands.sort((a, b) => b.score - a.score)[0] ?? null;
+      const eligible = !!(u.collateral > 0 && u.price > 0);
+      let reason: InspectRow['reason'] = 'no-data';
+      if (!eligible) reason = 'no-eligibility';
+      else if (best) reason = 'calculated';
+      else if (ctx.availableFunds <= 0) reason = 'no-budget';
+      else reason = 'no-data';
+      return {
+        ticker: u.ticker,
+        name: u.name,
+        price: u.price,
+        eligible,
+        topScore: best?.score ?? null,
+        topResilience: best?.resilience ?? null,
+        topResilienceTotal: best?.resilienceTotal ?? null,
+        topShares: best?.shares ?? null,
+        reason
+      };
+    });
+  });
+
+  const inspectFiltered = $derived.by(() => {
+    let rows = inspectRows;
+    if (inspectSearch.trim()) {
+      const q = inspectSearch.toLowerCase();
+      rows = rows.filter((r) => r.ticker.toLowerCase().includes(q) || r.name.toLowerCase().includes(q));
+    }
+    if (inspectOnlyInsufficient) {
+      rows = rows.filter((r) => r.reason !== 'calculated');
+    }
+    rows = [...rows].sort((a, b) => {
+      if (inspectSort === 'ticker') return a.ticker.localeCompare(b.ticker);
+      if (inspectSort === 'value') return b.price - a.price;
+      return (b.topResilience ?? -1) - (a.topResilience ?? -1);
+    });
+    return rows;
+  });
 
   function loadInto(c: FinderCandidate) {
-    setPendingTrade({ ticker: c.ticker, shares: c.shares });
+    preview = c;
+  }
+
+  function confirmLoad() {
+    if (!preview) return;
+    addDecision({
+      ts: new Date().toISOString(),
+      ticker: preview.ticker,
+      shares: preview.shares,
+      price: preview.price,
+      bufferPct: preview.bufferPct,
+      mode: app.finder.mode,
+      resilience: `${preview.resilience}/${preview.resilienceTotal}`,
+      scope: app.finder.scope
+    });
+    setCurrentTrade({
+      ticker: preview.ticker,
+      shares: preview.shares,
+      additionalCash: app.currentTrade?.additionalCash ?? 0,
+      holdingDays: app.currentTrade?.holdingDays ?? 30,
+      updatedAt: new Date().toISOString()
+    });
+    preview = null;
     goto('/simulator');
   }
 
-  const levelOf = (s: string): 'success' | 'warning' | 'danger' =>
-    s === 'danger' ? 'danger' : s === 'warning' ? 'warning' : 'success';
+  const modeExplain = $derived(
+    app.finder.mode === 'safety'
+      ? t('findModeExplainSafety')
+      : app.finder.mode === 'upside'
+        ? t('findModeExplainUpside')
+        : t('findModeExplainBalanced')
+  );
+
+  const scopeLabel = $derived(
+    app.finder.scope === 'worst'
+      ? t('findScopeWorst')
+      : app.finder.scope === 'average'
+        ? t('findScopeAverage')
+        : t('findScopeSelected')
+  );
 </script>
 
-<PageHeader eyebrow="Karar desteği" title="Trade Bulucu" desc="Bu bütçe ve portföyle en iyi sonucu veren trade′i bul. Her kart neden öne çıktığını açıklar." />
+<PageHeader eyebrow={t('findEyebrow')} title={t('findTitle')} desc={t('findDesc')} />
 
-<GuidedNote title="Seçili mod = bugünün bahsi">
-  <strong>Worst-case</strong> modunda #1, kötü senaryolarda bile ayakta kalan trade′dir. <strong>Selected-only</strong> modunda #1 ise
-  sadece şu anki senaryo için en iyisidir. İkisi farklıdır.
+<GuidedNote title={t('findGuidedTitle')}>
+  {t('findGuidedBody')}
 </GuidedNote>
 
 <div class="finder">
   <aside class="card filters">
-    <h3>Filtreler</h3>
-    <label>Bütçe (USD)
-      <input type="number" min="1" step="10" value={app.finder.budget} oninput={(e) => setFinder({ budget: parseFloat((e.currentTarget as HTMLInputElement).value) || 0 })} />
-    </label>
-    <label>Risk toleransı
-      <select value={app.finder.riskTolerance} onchange={(e) => setFinder({ riskTolerance: (e.currentTarget as HTMLSelectElement).value as FinderConfig['riskTolerance'] })}>
-        <option value="low">Düşük</option>
-        <option value="medium">Orta</option>
-        <option value="high">Yüksek</option>
-      </select>
-    </label>
-    <label>Karar hedefi
-      <select value={app.finder.goal} onchange={(e) => setFinder({ goal: (e.currentTarget as HTMLSelectElement).value as FinderConfig['goal'] })}>
-        <option value="fit">Portföy uyumu</option>
-        <option value="safest">En güvenli</option>
-        <option value="return">Getiri odaklı</option>
-      </select>
-    </label>
-    <label>Skor modu
-      <select value={app.finder.mode} onchange={(e) => setFinder({ mode: (e.currentTarget as HTMLSelectElement).value as FinderMode })}>
-        <option value="balanced">Dengeli</option>
-        <option value="safety">Güvenli</option>
-        <option value="upside">Getiri</option>
-      </select>
-    </label>
-    <label>Senaryo kapsamı
-      <select value={app.finder.scope} onchange={(e) => setFinder({ scope: (e.currentTarget as HTMLSelectElement).value as ScenarioScope })}>
-        <option value="selected">Seçili senaryo</option>
-        <option value="average">Tüm senaryolar (ortalama)</option>
-        <option value="worst">Tüm senaryolar (en kötü)</option>
-      </select>
-    </label>
-    <label>Maksimum lot
-      <input type="number" min="1" max="20" value={app.finder.maxLot} oninput={(e) => setFinder({ maxLot: Math.max(1, parseInt((e.currentTarget as HTMLInputElement).value) || 1) })} />
-    </label>
-    <Button icon="scan-search" onclick={run}>Bulucu çalıştır</Button>
-    <p class="avail">Kullanılabilir teminat: <strong>{fmtMoney(stats.availableCollateral)}</strong></p>
+    <h3>{t('findFilters')}</h3>
+
+    <div class="fgroup">
+      <div class="fgroup-label">{t('findGoal')}</div>
+      <label>{t('findDecisionGoal')}
+        <select value={app.finder.goal} onchange={(e) => setFinder({ goal: (e.currentTarget as HTMLSelectElement).value as FinderConfig['goal'] })}>
+          <option value="fit">{t('findGoalFit')}</option>
+          <option value="safest">{t('findGoalSafest')}</option>
+          <option value="return">{t('findGoalReturn')}</option>
+        </select>
+      </label>
+      <label>{t('findScoreMode')}
+        <select value={app.finder.mode} onchange={(e) => setFinder({ mode: (e.currentTarget as HTMLSelectElement).value as FinderMode })}>
+          <option value="balanced">{t('findModeBalanced')}</option>
+          <option value="safety">{t('findModeSafety')}</option>
+          <option value="upside">{t('findModeUpside')}</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="fgroup">
+      <div class="fgroup-label">{t('findRisk')}</div>
+      <label>{t('findRiskTolerance')}
+        <select value={app.finder.riskTolerance} onchange={(e) => setFinder({ riskTolerance: (e.currentTarget as HTMLSelectElement).value as FinderConfig['riskTolerance'] })}>
+          <option value="low">{t('findRiskLow')}</option>
+          <option value="medium">{t('findRiskMed')}</option>
+          <option value="high">{t('findRiskHigh')}</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="fgroup">
+      <div class="fgroup-label">{t('findUniverse')}</div>
+      <label>{t('findScope')}
+        <select value={app.finder.scope} onchange={(e) => setFinder({ scope: (e.currentTarget as HTMLSelectElement).value as ScenarioScope })}>
+          <option value="selected">{t('findScopeSelected')}</option>
+          <option value="average">{t('findScopeAverage')}</option>
+          <option value="worst">{t('findScopeWorst')}</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="fgroup">
+      <div class="fgroup-label">{t('findConstraint')}</div>
+      <label>{t('findBudget')}
+        <input type="number" min="1" step="10" value={app.finder.budget} oninput={(e) => setFinder({ budget: parseFloat((e.currentTarget as HTMLInputElement).value) || 0 })} />
+      </label>
+      <label>{t('findMaxLot')}
+        <input type="number" min="1" max="20" value={app.finder.maxLot} oninput={(e) => setFinder({ maxLot: Math.max(1, parseInt((e.currentTarget as HTMLInputElement).value) || 1) })} />
+      </label>
+    </div>
+
+    <Button icon="scan-search" onclick={run}>{t('findRun')}</Button>
+    <p class="avail">{t('findAvailCollateral')} <strong>{fmtMoney(stats.availableCollateral)}</strong></p>
   </aside>
 
-  <div class="results">
+  <div class="results" aria-live="polite">
+    <p class="mode-note">{modeExplain} · {t('findScopeNote')} {scopeLabel}</p>
     <section>
-      <h3 class="sec-title">Global Top 3</h3>
+      <h3 class="sec-title">{t('findGlobalTop')}</h3>
       <div class="cards">
         {#each result.global as c, i (c.ticker + c.shares)}
           <article class="fcard">
@@ -108,61 +269,144 @@
                 <div class="fc-title">{c.ticker} × {fmtShares(c.shares)}</div>
                 <div class="fc-name">{universeNames[c.ticker]}</div>
               </div>
-              <Badge level={levelOf(c.status)} label={levelLabel(c.status)} />
+              <Badge
+                kind="result"
+                level={c.resilience === c.resilienceTotal ? 'success' : c.resilience >= c.resilienceTotal / 2 ? 'warning' : 'danger'}
+                label={t('findResilientShort', { n: c.resilience, total: c.resilienceTotal })}
+              />
             </div>
             <div class="badges">
-              <Badge level="neutral" label={`En iyi: ${c.bestInScenario}`} />
+              <Badge level="neutral" label={t('findBestIn', { scenario: c.bestInScenario })} />
+              <Badge level="neutral" label={c.mcDay < 0 ? t('simRunwayLong') : t('findWorstShort', { value: t('simMcDay', { day: c.mcDay }) })} />
             </div>
             <div class="kpis">
-              <div><span>Skor</span><strong class="tabular">{c.score.toFixed(1)}</strong></div>
-              <div><span>Değer</span><strong class="tabular">{fmtMoney(c.tradeValue)}</strong></div>
-              <div><span>Net P/L</span><strong class="tabular" class:pos={c.netPL >= 0} class:neg={c.netPL < 0}>{fmtMoney(c.netPL, { sign: true })}</strong></div>
-              <div><span>Buffer</span><strong class="tabular">{fmtPct(c.bufferPct, 1)}</strong></div>
+              <div><span>{t('findScore')}</span><strong class="tabular">{c.score.toFixed(1)}</strong></div>
+              <div><span>{t('thValue')}</span><strong class="tabular">{fmtMoney(c.tradeValue)}</strong></div>
+              <div><span>{t('findNetPL')}</span><strong class="tabular" class:pos={c.netPL >= 0} class:neg={c.netPL < 0}>{fmtMoney(c.netPL, { sign: true })}</strong></div>
+              <div><span>{t('findBuffer')}</span><strong class="tabular">{fmtPct(c.bufferPct, 1)}</strong></div>
             </div>
             <p class="rationale">{c.rationale}</p>
             <details>
-              <summary>Detay</summary>
+              <summary>{t('commonDetail')}</summary>
               <ul class="detail-list">
-                <li><span>Margin borcu</span><span class="tabular">{fmtMoney(c.borrow)}</span></li>
-                <li><span>MC günü</span><span class="tabular">{c.mcDay < 0 ? 'uzun' : c.mcDay}</span></li>
-                <li><span>Beta</span><span class="tabular">{c.beta.toFixed(2)}</span></li>
-                <li><span>Sektör</span><span>{c.sector}</span></li>
+                <li><span>{t('findMarginDebt')}</span><span class="tabular">{fmtMoney(c.borrow)}</span></li>
+                <li><span>{t('simMcDayLabel')}</span><span class="tabular">{c.mcDay < 0 ? t('simRunwayLong') : c.mcDay}</span></li>
+                <li><span>{t('findBeta')}</span><span class="tabular">{c.beta.toFixed(2)}</span></li>
+                <li><span>{t('lblSector')}</span><span>{sectorLabel(c.sector)}</span></li>
               </ul>
             </details>
-            <Button variant="secondary" icon="calculator" onclick={() => loadInto(c)}>Trade′e yükle</Button>
+            <Button variant="secondary" icon="calculator" onclick={() => loadInto(c)}>{t('findLoadTrade')}</Button>
           </article>
         {/each}
       </div>
     </section>
 
     <section>
-      <h3 class="sec-title">Hisse bazlı Top 3</h3>
-      <div class="acc">
-        {#each Object.entries(result.perStock) as [tk, list] (tk)}
-          <div class="acc-block">
-            <button class="acc-head" onclick={() => toggle(tk)}>
-              <span>{tk} — {universeNames[tk]}</span>
-              <span class="acc-meta">{list.length} sonuç <Icon name="chevron" size={16} class={expanded === tk ? 'rot' : ''} /></span>
-            </button>
-            {#if expanded === tk}
-              <div class="acc-body">
-                {#each list as c (c.shares)}
-                  <div class="acc-row">
-                    <span class="tabular">{fmtShares(c.shares)} lot</span>
-                    <Badge level={levelOf(c.status)} label={levelLabel(c.status)} />
-                    <span class="tabular">Skor {c.score.toFixed(1)}</span>
-                    <span class="tabular">Buf {fmtPct(c.bufferPct, 0)}</span>
-                    <button class="mini" onclick={() => loadInto(c)}>Yükle</button>
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        {/each}
-      </div>
+      <h3 class="sec-title">{t('findPerStockTop')}</h3>
+      <p class="empty-note">{t('findInspectHint')}</p>
+      <button class="inspect-btn" type="button" onclick={() => (inspectOpen = true)}>
+        {t('findInspectAll')}
+      </button>
     </section>
   </div>
 </div>
+
+<Modal open={preview !== null} eyebrow={t('findPreviewTitle')} title={preview ? t('findPreviewLoad', { ticker: preview.ticker, shares: preview.shares }) : ''} onclose={() => (preview = null)}>
+  {#if preview && previewData}
+    <p class="pv-intro">{t('findPvIntro')}</p>
+    <div class="pv-grid">
+      <div class="pv-row">
+        <span>{t('findAvailCollateral')}</span>
+        <span class="tabular">{fmtMoney(previewData.before.availableCollateral)} → <strong>{fmtMoney(previewData.after.availableCollateral)}</strong></span>
+      </div>
+      <div class="pv-row">
+        <span>{t('findMaxWeight')}</span>
+        <span class="tabular">{fmtPct(previewData.before.concentration * 100, 0)} → <strong>{fmtPct(previewData.after.concentration * 100, 0)}</strong></span>
+      </div>
+      <div class="pv-row">
+        <span>{t('findHealthScore')}</span>
+        <span class="tabular">{previewData.before.health} → <strong>{previewData.after.health}</strong></span>
+      </div>
+      <div class="pv-row">
+        <span>{t('findNewTradeBuffer')}</span>
+        <span class="tabular"><strong>{fmtPct(preview.bufferPct, 1)}</strong></span>
+      </div>
+      <div class="pv-row">
+        <span>{t('findResilience')}</span>
+        <span class="tabular"><strong>{t('findResilienceCount', { resilient: preview.resilience, total: preview.resilienceTotal })}</strong></span>
+      </div>
+    </div>
+    <p class="pv-foot">{t('findPvFoot')}</p>
+    <div class="pv-actions">
+      <Button variant="secondary" onclick={() => (preview = null)}>{t('commonCancel')}</Button>
+      <Button onclick={confirmLoad}>{t('findLoadSim')}</Button>
+    </div>
+  {/if}
+</Modal>
+
+<Modal open={inspectOpen} eyebrow={t('findInspectAll')} title={t('findInspectAll')} onclose={() => (inspectOpen = false)} wide>
+  <div class="inspect-toolbar">
+    <input
+      type="text"
+      placeholder={t('findInspectSearch')}
+      bind:value={inspectSearch}
+      class="inspect-search"
+    />
+    <label class="inspect-sort">
+      {t('findInspectSort')}:
+      <select bind:value={inspectSort}>
+        <option value="ticker">{t('findInspectSort')}: ticker</option>
+        <option value="value">{t('findInspectSort')}: value</option>
+        <option value="resilience">{t('findInspectSort')}: resilience</option>
+      </select>
+    </label>
+    <label class="inspect-filter">
+      <input type="checkbox" bind:checked={inspectOnlyInsufficient} />
+      {t('findInsufficientFilter')}
+    </label>
+  </div>
+  {#if inspectFiltered.length === 0}
+    <div class="empty">
+      <h4>{t('findEmptyTitle')}</h4>
+      <p>{t('findEmptyBody')}</p>
+    </div>
+  {:else}
+    <div class="inspect-table-wrap">
+      <table class="inspect-table">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Price</th>
+            <th>{t('findInspectStatus')}</th>
+            <th>{t('findInspectBestScore')}</th>
+            <th>{t('findInspectResilience')}</th>
+            <th>{t('findInspectShares')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each inspectFiltered as r (r.ticker)}
+            <tr class:insufficient={r.reason !== 'calculated'}>
+              <td>
+                <strong>{r.ticker}</strong>
+                <span class="muted">{r.name}</span>
+              </td>
+              <td class="tabular">{fmtMoney(r.price)}</td>
+              <td>
+                <Badge
+                  level={r.reason === 'calculated' ? 'success' : r.reason === 'no-eligibility' ? 'warning' : 'neutral'}
+                  label={r.reason === 'calculated' ? t('findStatusCalculated') : r.reason === 'no-eligibility' ? t('findStatusNoEligibility') : r.reason === 'no-budget' ? t('findStatusNoBudget') : t('findStatusNoData')}
+                />
+              </td>
+              <td class="tabular">{r.topScore !== null ? r.topScore.toFixed(1) : '—'}</td>
+              <td class="tabular">{r.topResilience !== null ? `${r.topResilience}/${r.topResilienceTotal}` : '—'}</td>
+              <td class="tabular">{r.topShares !== null ? fmtShares(r.topShares) : '—'}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {/if}
+</Modal>
 
 <style>
   .finder {
@@ -187,6 +431,20 @@
   .filters h3 {
     font-size: 20px;
     margin-bottom: var(--space-2);
+  }
+  .fgroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--border);
+  }
+  .fgroup-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: var(--faint);
   }
   .filters label {
     display: flex;
@@ -213,6 +471,41 @@
   .sec-title {
     font-size: 20px;
     margin-bottom: var(--space-4);
+  }
+  .mode-note {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 var(--space-4);
+  }
+  .pv-intro {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0 0 var(--space-4);
+  }
+  .pv-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+  .pv-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .pv-foot {
+    font-size: 12px;
+    color: var(--faint);
+    margin: 0 0 var(--space-4);
+  }
+  .pv-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
   }
   .cards {
     display: flex;
@@ -294,64 +587,90 @@
     border-top: 1px solid var(--border);
     font-size: 14px;
   }
-  .acc {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  .acc-block {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-  }
-  .acc-head {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--space-4);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: var(--text);
-    font-weight: 700;
-    font-size: 15px;
-  }
-  .acc-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--muted);
-    font-weight: 600;
-  }
-  .acc-body {
-    padding: 0 var(--space-4) var(--space-4);
-  }
-  .acc-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: 10px 0;
-    border-top: 1px solid var(--border);
-    font-size: 14px;
-  }
-  .acc-row .mini {
-    margin-left: auto;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 13px;
-    color: var(--text);
-  }
   :global(.rot) {
     transform: rotate(180deg);
     transition: transform 180ms ease;
   }
+  .empty-note {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 var(--space-3);
+    line-height: 1.5;
+  }
+  .inspect-btn {
+    background: var(--text);
+    color: var(--inverse);
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .inspect-btn:hover { opacity: 0.85; }
+  .inspect-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    margin-bottom: var(--space-3);
+  }
+  .inspect-search {
+    flex: 1 1 220px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .inspect-sort, .inspect-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .inspect-sort select {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  .inspect-table-wrap {
+    max-height: 50vh;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .inspect-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .inspect-table th, .inspect-table td {
+    padding: 9px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .inspect-table th {
+    background: var(--surface-2);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .inspect-table td.tabular { text-align: right; }
+  .inspect-table tr.insufficient td { color: var(--muted); }
+  .inspect-table .muted { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .empty {
+    text-align: center;
+    padding: var(--space-6);
+    color: var(--muted);
+  }
+  .empty h4 { color: var(--text); margin: 0 0 6px; }
   @media (max-width: 960px) {
     .finder {
       grid-template-columns: 1fr;

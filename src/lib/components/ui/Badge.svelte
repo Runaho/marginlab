@@ -4,12 +4,17 @@
   let {
     level = 'neutral',
     label,
-    icon
-  }: { level?: 'success' | 'warning' | 'danger' | 'safe' | 'neutral'; label: string; icon?: string } =
-    $props();
+    icon,
+    kind
+  }: {
+    level?: 'success' | 'warning' | 'danger' | 'safe' | 'neutral';
+    label: string;
+    icon?: string;
+    kind?: 'result' | 'alert' | 'education' | 'action';
+  } = $props();
 </script>
 
-<span class="badge badge-{level}">
+<span class="badge badge-{level}" class:badge-result={kind === 'result'} class:badge-alert={kind === 'alert'} class:badge-education={kind === 'education'} class:badge-action={kind === 'action'}>
   <span class="dot"></span>
   {#if icon}<Icon name={icon} size={14} />{/if}
   {label}
@@ -58,5 +63,19 @@
     color: var(--muted);
     background: var(--surface-3);
     border-color: var(--border);
+  }
+  .badge-result {
+    border-style: solid;
+  }
+  .badge-alert {
+    border-style: solid;
+    border-left-width: 3px;
+  }
+  .badge-education {
+    border-style: dashed;
+  }
+  .badge-action {
+    border-style: solid;
+    box-shadow: inset 0 0 0 1px currentColor;
   }
 </style>

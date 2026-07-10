@@ -22,6 +22,8 @@ Türkçe ve education‑focus′tur; rehber modu açıkken her sayfada `GuidedNo
 - **Bileşenler:** PageHeader, GuidedNote, hero panel + 3 `Metric`, 4 `KpiCard`, `WarningBox`
   (alerts), `BarChart` (sağlık profili), `Donut` (sektör dağılımı), `Badge`.
 - **Çıktılar:** sağlık skoru, kullanılabilir teminat, alım gücü, yoğunlaşma, buffer, uyarılar.
+- **i18n:** Başlık için `pageGeneralTitle2` kullanılır (kısa üst satır); `pageGeneralSubtitle2`
+  gövdeyi verir. `pageGeneralTitle` ise daha uzun açıklama cümlesi içindir.
 - **Akış:** hero → metrikler → KPI → uyarı → grafikler.
 
 ---

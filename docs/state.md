@@ -1,7 +1,7 @@
 # Durum Yönetimi (State)
 
 Merkezi, reaktif uygulama durumu Svelte 5 runes ile yönetilir. Amaç: tek bir doğru durum,
-URL′de taşınabilir olması (localStorage çökmesin) ve tema kalıcılığı.
+paylaşım için explicit `Share` eylemi, otomatik kalıcılık için `localStorage`.
 
 > Klasör: `src/lib/state/`
 
@@ -14,13 +14,28 @@ Svelte 5′in `.svelte.ts` dosyasında modül seviyesinde `$state` kullanır.
 ### Durum şekli
 ```ts
 app = $state({
-  portfolio: PortfolioData,      // holdings + cash + account
-  activeScenario: string,        // senaryo adı
-  finder: FinderConfig,          // bulucu filtreleri
-  guided: boolean,               // rehber modu açık mı
+  portfolio: PortfolioData,             // holdings + cash + account
+  activeScenario: string,               // senaryo adı
+  finder: FinderConfig,                 // bulucu filtreleri
+  guided: boolean,                      // rehber modu açık mı
   theme: 'light' | 'dark',
-  pendingTrade: { ticker, shares } | null  // bulucu -> simülatör devri
+  currentTrade: WorkingTrade | null,    // üzerinde çalışılan trade taslağı
+  decisionLog: DecisionRecord[],        // Finder onay kayıtları (max 20)
+  watchlist: WatchlistItem[],
+  eduDone: Record<number, boolean>,     // education step tamamlanma durumu
+  persistenceError: boolean             // quota aşımı sinyali
 })
+```
+
+`WorkingTrade` tipi (`portfolioRepository.ts`):
+```ts
+interface WorkingTrade {
+  ticker: string;
+  shares: number;
+  additionalCash: number;
+  holdingDays: number;
+  updatedAt: string; // ISO
+}
 ```
 
 ### Ana Fonksiyonlar
@@ -31,16 +46,35 @@ app = $state({
 | `setCash(n)` / `setAccount(patch)` | Hesap ayarlarını günceller |
 | `addHolding(h)` / `updateHolding(i, patch)` / `removeHolding(i)` | Pozisyon CRUD |
 | `setActiveScenario(name)` | Aktif senaryoyu seçer |
-| `setFinder(patch)` | Bulucu filtrelerini günceller |
+| `setFinder(patch)` | Bulucu filtreleri |
 | `setGuided(v)` | Rehber modunu açar/kapatır |
 | `loadPortfolio(data)` / `resetPortfolio()` | Portföyü JSON′dan yükler/sıfırlar |
-| `setPendingTrade(t)` | Bulucu′dan simülatöre trade devreder |
+| `setCurrentTrade(t)` / `clearCurrentTrade()` | Üzerinde çalışılan trade taslağını yazar/sıfırlar |
+| `setEduDone(n, v)` | Education step tamamlanma durumunu yazar |
+| `buildShareUrl()` | `#d=<base64>` payload URL'i üretir (paylaşım için) |
 
-### Kalıcılık — URL Hash
-- `hydrateFromHash()` — sayfa açılışında `#d=...` hash′ini `btoa`/JSON ile çözer, state′i doldurur.
-- `syncHash()` — state değiştikçe `#d=<base64 JSON>`′a yazar (`history.replaceState`).
-- Böylece sayfa yenilense bile portföy/filtreler korunur; `localStorage`′a uygulama verisi yazılmaz
-  (read‑05′in "sandbox′ta localStorage çökmesin" kuralı).
+### Kalıcılık — localStorage + explicit Share
+
+- **`portfolioRepository.ts`** — `repository.ts` deseninin kopyası:
+  - Storage key: `mc-app-state` (`mc-theme` / `mc-settings` / `marginlab.locale` ile aynı isim alanı).
+  - `load()` / `save()` / `reset()` + `version: 1` migration (defaults'a deepMerge).
+  - QuotaExceededError → `console.warn` + `false` döner; UI `app.persistenceError` set eder.
+- **`hydrateFromStorage()`** — ilk yüklemede:
+  1. `localStorage["mc-app-state"]`'i oku, `applyShape` ile state'e uygula.
+  2. URL'de eski `#d=...` varsa: parse et → state'e uygula → localStorage'a yaz → `history.replaceState` ile hash'i temizle (geriye dönük uyumluluk, tek seferlik import).
+- **`syncStorage()`** — `app.*` alanları değiştikçe 250ms debounce ile `repo.save(toPersistShape())`. URL temiz kalır; otomatik hash yazımı yok.
+- **`buildShareUrl()`** — Topbar'daki Share butonu tarafından çağrılır. URL'i üretir + clipboard'a kopyalar (fallback: `prompt()`).
+
+### Trade continuity (cross-screen working draft)
+
+Kullanıcı bir trade'i bir ekranda planladığında diğer ekranlar aynı taslaktan devam eder:
+
+- **Simulator** yazar — her input değişiminde `$effect` ile `setCurrentTrade(...)` çağrılır.
+- **Scenarios** salt okunur — `$derived(app.currentTrade?.ticker ?? 'NVDA')` vb.
+- **DecisionStrip** + **MarginCallMap** — `app.currentTrade` üzerinden gösterim.
+- **Finder** onay modalı → `setCurrentTrade({ ticker, shares, additionalCash, holdingDays, updatedAt })`.
+
+`pendingTrade` (eski tip) silinmiştir; gerekirse `setPendingTrade({ ticker, shares })` uyumluluk shim'i kullanılabilir (default `additionalCash=0`, `holdingDays=30`).
 
 ### Tema istisnası
 Tema `localStorage`′da tutulur (`mc-theme`) çünkü flash önleme script′i (`app.html`) ilk
@@ -66,10 +100,11 @@ closeConcept()     // modalı kapatır
 
 ```
 Kullanıcı girişi
-   → appState mutator (ör. setCash)
+   → appState mutator (ör. setCash, setCurrentTrade)
    → $derived(portfolioStats(app.portfolio)) otomatik yenilenir
    → sayfa yeniden render
-   → $effect → syncHash() → URL güncellenir
+   → $effect → syncStorage() → localStorage["mc-app-state"] yazılır (250ms debounce)
+   → Topbar Share butonu → buildShareUrl() → clipboard (explicit kullanıcı eylemi)
 ```
 
 ---
@@ -82,5 +117,8 @@ tutmaka, tüm sayfalar aynı merkezi durumu paylaşır; prop drilling gerekmez.
 
 ## Güvenlik / Gizlilik
 - Uygulama verisi tarayıcıda kalır; hiçbir sunucuya gönderilmez.
+- URL otomatik olarak state içermez; paylaşım yalnızca explicit `Share` eylemiyle olur.
 - `parsePortfolio` kullanıcı JSON′ını katı doğrular (eksik `cash`, bozuk `holdings` vb. için
   Türkçe hata) — kötü biçimli dosya uygulamayı çökertmez.
+- `hydrateFromStorage` schema validation uygular: `version !== 1` veya bozuk JSON
+  `seedShape()`'a deepMerge ile geri döner (S-3 pattern'i).

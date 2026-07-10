@@ -1,80 +1,65 @@
 <script lang="ts">
+  import { app, setEduDone } from '$lib/state/appState.svelte';
   import { openConcept } from '$lib/state/conceptStore';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import GuidedNote from '$lib/components/ui/GuidedNote.svelte';
   import WarningBox from '$lib/components/ui/WarningBox.svelte';
   import Icon from '$lib/components/icons/Icon.svelte';
+  import { t } from '$lib/i18n';
 
-  const steps = [
-    {
-      n: 1,
-      title: 'Portföy fotoğrafı',
-      body: 'Eldeki hisselerin her biri aynı zamanda bir teminat kalemidir. CSCO, CSWC, TRIN ve GFS′in değeri, yeni trade için alım gücü üretir. Nakit ise en saf teminattır.',
-      concept: 'collateral'
-    },
-    {
-      n: 2,
-      title: 'Risk açıklaması',
-      body: 'Margin, broker′dan aldığın kredidir. Borcun faizi her gün işler. Sürdürme teminatı altına düşersen aşağı çağrılırsın: ya nakit ekle ya sat.',
-      concept: 'maintenance'
-    },
-    {
-      n: 3,
-      title: 'Margin kurulumu',
-      body: 'Başlangıç teminatı (Reg T %50) açılışta koyman gereken özkaynaktır. Simülatörde bu oranı ve sürdürme oranını kendin ayarlayabilirsin.',
-      concept: 'initial'
-    },
-    {
-      n: 4,
-      title: 'Senaryo baskısı',
-      body: 'Tek bir fiyat yerine sekiz senaryoyu birden test et. "Credit Stress" senaryosunda eldeki portföy düşer, trade yerinde kalır — sessiz katil.',
-      concept: 'scenario'
-    },
-    {
-      n: 5,
-      title: 'Alternatif arama',
-      body: 'Bulucu, bütçen ve portföyünle en dayanıklı trade′i sıralar. "En kötü senaryo" modu, kötü piyasada bile ayakta kalanı öne çıkarır.',
-      concept: 'buffer'
-    }
-  ];
+  const stepNums = [1, 2, 3, 4, 5];
+  const stepConcepts = ['collateral', 'maintenance', 'initial', 'scenario', 'buffer'];
+  const stepHrefs = ['/portfolio', '/portfolio', '/simulator', '/scenarios', '/finder'];
 
   const warnings = [
-    { level: 'warning' as const, title: 'Dar buffer', body: 'Buffer %10′ın altındaysa küçük bir düşüş seni margin call sınırına iter. Lot düşür veya teminat oranını artır.' },
-    { level: 'danger' as const, title: 'Yoğun pozisyon', body: 'Bir hisse portföyün %40′ından fazlaysa broker ek haircut uygular; çeşitlendirme kaybolur.' },
-    { level: 'warning' as const, title: 'Faiz baskısı', body: 'Taşıma maliyeti sessizdir: fiyat yerinde kalsa bile borç faizi pozisyonu eritir. Flat senaryoda bunu gör.' },
-    { level: 'warning' as const, title: 'Mobil okunabilirlik', body: 'Aksiyonlar üstte, sayılar tabular hizalı. Önemli karar önce gelir, detay bir dokunuş uzağında.' },
-    { level: 'neutral' as const, title: 'İkon + metin', body: 'Hiçbir ikon yalnız kullanılmaz; her görselin yanında anlamı vardır. Erişilebilirlik önceliktir.' }
+    { level: 'warning' as const, titleKey: 'eduWarn1Title', bodyKey: 'eduWarn1Body' },
+    { level: 'danger' as const, titleKey: 'eduWarn2Title', bodyKey: 'eduWarn2Body' },
+    { level: 'warning' as const, titleKey: 'eduWarn3Title', bodyKey: 'eduWarn3Body' },
+    { level: 'warning' as const, titleKey: 'eduWarn4Title', bodyKey: 'eduWarn4Body' },
+    { level: 'neutral' as const, titleKey: 'eduWarn5Title', bodyKey: 'eduWarn5Body' }
   ];
 </script>
 
-<PageHeader eyebrow="Öğrenme" title="Eğitim Akışı" desc="Margin mantığı neden böyle çalışır? Karar destek araçlarını kullanmadan önce bu beş adımı izle." />
+<PageHeader eyebrow={t('eduEyebrow')} title={t('eduTitle')} desc={t('eduDesc')} />
 
-<GuidedNote title="Açıkla — sonra hesapla">
-  Bu sayfa kavramları sırayla öğretir. Her adımdaki <strong>kavram bağlantısı</strong> ilgili terimin üründeki karşılığını gösterir.
+<GuidedNote title={t('eduGuidedTitle')}>
+  {t('eduGuidedBody')}
 </GuidedNote>
 
 <div class="edu">
   <section class="flow">
-    <h3>5 adımlı öğrenme akışı</h3>
-    {#each steps as s (s.n)}
-      <div class="step">
-        <div class="step-n">{s.n}</div>
+    <h3>{t('eduFlowTitle')}</h3>
+    {#each stepNums as n (n)}
+      <div class="step" class:done={app.eduDone[n]}>
+        <div class="step-n">{n}</div>
         <div class="step-body">
-          <div class="step-title">{s.title}</div>
-          <p>{s.body}</p>
-          <button class="clink" onclick={() => openConcept(s.concept)}><Icon name="info" size={14} /> İlgili kavram</button>
+          <div class="step-title">{t(`eduStep${n}Title`)}</div>
+          <p>{n === 3 ? t('eduStep3Body2') : t(`eduStep${n}Body`)}</p>
+          <div class="task">
+            <Icon name="target" size={14} />
+            <span><strong>{t('eduTask')}</strong> {t(`eduStep${n}Task`)}</span>
+          </div>
+          <div class="step-actions">
+            <button class="clink" onclick={() => openConcept(stepConcepts[n - 1])}><Icon name="info" size={14} /> {t('eduConceptLink')}</button>
+            <a class="clink cta" href={stepHrefs[n - 1]}><Icon name="waypoints" size={14} /> {t(`eduStep${n}Cta`)}</a>
+            <button class="clink" class:done-btn={app.eduDone[n]} onclick={() => setEduDone(n, !app.eduDone[n])}>
+              <Icon name={app.eduDone[n] ? 'shield-check' : 'plus'} size={14} />
+              {app.eduDone[n] ? t('eduDone') : t('eduComplete')}
+            </button>
+          </div>
         </div>
       </div>
     {/each}
   </section>
 
   <aside class="flow warn-flow">
-    <h3>5 uyarı akışı</h3>
-    {#each warnings as w (w.title)}
-      <WarningBox level={w.level} title={w.title} detail={w.body} />
+    <h3>{t('eduWarnTitle')}</h3>
+    {#each warnings as w (w.titleKey)}
+      <WarningBox level={w.level} title={t(w.titleKey)} detail={t(w.bodyKey)} />
     {/each}
   </aside>
 </div>
+
 
 <style>
   .edu {
@@ -112,10 +97,37 @@
     font-size: 17px;
     margin-bottom: 6px;
   }
+  .step.done {
+    border-color: var(--success);
+    background: color-mix(in srgb, var(--success) 5%, var(--surface));
+  }
   .step-body p {
     color: var(--muted);
     line-height: 1.55;
     margin: 0 0 var(--space-3);
+  }
+  .task {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-bottom: var(--space-3);
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  .task :global(svg) {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--text);
+  }
+  .step-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
   .clink {
     display: inline-flex;
@@ -129,6 +141,16 @@
     border-radius: 999px;
     padding: 6px 12px;
     cursor: pointer;
+    text-decoration: none;
+  }
+  .clink.cta {
+    background: var(--text);
+    color: var(--inverse);
+    border-color: var(--text);
+  }
+  .clink.done-btn {
+    color: var(--success);
+    border-color: color-mix(in srgb, var(--success) 40%, transparent);
   }
   .warn-flow {
     gap: var(--space-3);

@@ -15,7 +15,7 @@
   --border: #d8d3cc;
   --text: #1f1c17;
   --muted: #6e685f;
-  --faint: #aaa39a;
+  --faint: #8a8378;
   --success: #2f6b3b;
   --warning: #9a5b13;
   --danger: #8e2437;
@@ -38,10 +38,37 @@
   --space-10: 40px;
   --space-16: 64px;
 
+  --space-5: 20px;
+  --space-12: 48px;
+
   --font-display: 'DM Serif Display', Georgia, 'Times New Roman', serif;
   --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
 
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ===== Semantic durum token'ları ===== */
+  --neutral-bg: var(--surface-2);
+  --neutral-border: var(--border);
+  --neutral-fg: var(--muted);
+
+  --info-bg: #eef1f6;
+  --info-border: #b9c4d6;
+  --info-fg: #34506e;
+
+  --positive-bg: #eaf3ec;
+  --positive-border: #a8ccb0;
+  --positive-fg: #235c30;
+
+  --attention-bg: #f7efe2;
+  --attention-border: #d9b787;
+  --attention-fg: #7d4a10;
+
+  --critical-bg: #f6e7ea;
+  --critical-border: #d6a2ac;
+  --critical-fg: #7a1f30;
+
+  /* okunabilir metin bloğu maksimum genişliği */
+  --measure: 68ch;
 }
 
 [data-theme='dark'] {
@@ -52,11 +79,27 @@
   --border: #38332b;
   --text: #f3efe7;
   --muted: #a59c8f;
-  --faint: #6f675c;
+  --faint: #90887b;
   --success: #6fcf86;
   --warning: #e0a35a;
   --danger: #e8758a;
   --inverse: #16140f;
+
+  --neutral-bg: var(--surface-2);
+  --neutral-border: var(--border);
+  --neutral-fg: var(--muted);
+  --info-bg: #1e2530;
+  --info-border: #3c4a5e;
+  --info-fg: #9db6d6;
+  --positive-bg: #1a2a1e;
+  --positive-border: #33503b;
+  --positive-fg: #7fd08f;
+  --attention-bg: #2b2115;
+  --attention-border: #574021;
+  --attention-fg: #e0a35a;
+  --critical-bg: #2b171c;
+  --critical-border: #573039;
+  --critical-fg: #e8758a;
 }
 
 @theme inline {
@@ -122,9 +165,34 @@ button {
   font-family: var(--font-body);
 }
 
-::selection {
-  background: var(--text);
-  color: var(--inverse);
+  ::selection {
+    background: var(--text);
+    color: var(--inverse);
+  }
+
+  /* Klavye ile gezinmede görünür odak halkası (erişilebilirlik) */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  summary:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+/* Ortak ana içerik container'ı — tüm ekranlarda tutarlı genişlik/padding */
+.page-container {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 3vw, 48px);
+}
+
+/* Okunabilir metin bloğu genişliği (kontrolsüz uzamayı engeller) */
+.measure {
+  max-width: var(--measure);
 }
 
 /* İnce kaydırma çubuğu */

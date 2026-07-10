@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import { NAV } from './nav';
   import Icon from '../icons/Icon.svelte';
+  import { t } from '$lib/i18n';
 
   let { onnav }: { onnav?: () => void } = $props();
 
@@ -9,7 +10,7 @@
 </script>
 
 <nav class="nav">
-  <div class="group-title">Çalışma Alanı</div>
+  <div class="group-title">{t('navWorkspace')}</div>
   {#each NAV as item (item.href)}
     {@const isActive = item.href === '/' ? active === '/' : active.startsWith(item.href)}
     <a
@@ -19,17 +20,18 @@
       onclick={() => onnav?.()}
     >
       <Icon name={item.icon} size={18} />
-      <span class="nav-label">{item.label}</span>
+      <span class="nav-label">
+        <span class="nav-text">{item.label}</span>
+        <span class="nav-step">{t('commonStep', { step: item.step, stage: item.stage })}</span>
+      </span>
     </a>
   {/each}
-  <div class="side-card">
-    <div class="eyebrow">Bu ürün ne yapar?</div>
+  <details class="side-card">
+    <summary><span class="eyebrow">{t('navAboutTitle')}</span></summary>
     <p>
-      MarginCall, portföyünü <strong>teminat motoru</strong> olarak okuyan bir karar
-      stüdyosudur. Trade′i açmadan önce maliyetini, riskini ve portföyün taşıyıp
-      taşıyamayacağını gösterir.
+      {t('navAboutBody')}
     </p>
-  </div>
+  </details>
 </nav>
 
 <style>
@@ -65,6 +67,21 @@
     background: var(--surface-2);
     border-color: var(--border);
   }
+  .nav-label {
+    display: flex;
+    flex-direction: column;
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .nav-step {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--faint);
+    letter-spacing: 0.02em;
+  }
+  .nav-link.active .nav-step {
+    color: color-mix(in srgb, var(--inverse) 70%, transparent);
+  }
   .nav-link.active {
     background: var(--text);
     color: var(--inverse);
@@ -76,6 +93,16 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: var(--space-4);
+  }
+  .side-card summary {
+    cursor: pointer;
+    list-style: none;
+  }
+  .side-card summary::-webkit-details-marker {
+    display: none;
+  }
+  .side-card[open] summary {
+    margin-bottom: 6px;
   }
   .side-card p {
     font-size: 13px;

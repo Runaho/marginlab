@@ -1,7 +1,11 @@
 import type { Holding, PortfolioData, Sector } from './types';
+import type { CollateralSource } from './marginProfile';
+import { DEFAULT_COLLATERAL_RATE } from './marginProfile';
 import { SECTORS } from './presets';
 
 const SECTOR_SET = new Set<string>(SECTORS);
+const COLLATERAL_SOURCES: CollateralSource[] = ['broker-data', 'default-assumption', 'user-override', 'unavailable', 'unknown'];
+const SOURCE_SET = new Set<string>(COLLATERAL_SOURCES);
 
 export function serializePortfolio(data: PortfolioData): string {
   const clean: PortfolioData = {
@@ -19,6 +23,8 @@ export function serializePortfolio(data: PortfolioData): string {
       cost: round(h.cost),
       beta: h.beta,
       collateral: h.collateral,
+      collateralSource: h.collateralSource ?? 'default-assumption',
+      excludeFromCollateral: h.excludeFromCollateral ?? false,
       sector: h.sector
     }))
   };
@@ -69,7 +75,12 @@ export function parsePortfolio(text: string): PortfolioData {
       price: num(hh.price, 'price'),
       cost: typeof hh.cost === 'number' ? hh.cost : num(hh.price, 'cost'),
       beta: typeof hh.beta === 'number' ? hh.beta : 1,
-      collateral: typeof hh.collateral === 'number' ? hh.collateral : 0.75,
+      collateral: typeof hh.collateral === 'number' ? hh.collateral : DEFAULT_COLLATERAL_RATE,
+      collateralSource:
+        typeof hh.collateralSource === 'string' && SOURCE_SET.has(hh.collateralSource)
+          ? (hh.collateralSource as CollateralSource)
+          : 'default-assumption',
+      excludeFromCollateral: hh.excludeFromCollateral === true,
       sector
     };
   });

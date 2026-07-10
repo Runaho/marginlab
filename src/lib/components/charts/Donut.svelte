@@ -5,12 +5,17 @@
     color: string;
   }
 
-  let { data, size = 220 }: { data: Slice[]; size?: number } = $props();
+  import { t } from '$lib/i18n';
+
+  let { data, size = 220, ariaLabel = t('allocTitle') }: { data: Slice[]; size?: number; ariaLabel?: string } = $props();
 
   const total = $derived(data.reduce((s, d) => s + d.value, 0) || 1);
   const r = $derived(size / 2 - 4);
   const cx = $derived(size / 2);
   const cy = $derived(size / 2);
+  const largest = $derived(
+    data.length ? data.reduce((a, b) => (b.value > a.value ? b : a)) : null
+  );
 
   function arc(cum: number, frac: number) {
     const a0 = cum * 2 * Math.PI - Math.PI / 2;
@@ -25,7 +30,7 @@
 </script>
 
 <div class="donut-wrap">
-  <svg viewBox="0 0 {size} {size}" width={size} height={size} role="img">
+  <svg viewBox="0 0 {size} {size}" width={size} height={size} role="img" aria-label={ariaLabel}>
     {#if total <= 0}
       <circle {cx} {cy} r={r - 14} fill="none" stroke="var(--border)" stroke-width="2" />
     {:else}
@@ -35,10 +40,15 @@
       {/each}
     {/if}
     <circle {cx} {cy} r={r - 22} fill="var(--surface)" />
-    <text x={cx} y={cy - 4} text-anchor="middle" class="center" fill="var(--text)">
-      {Math.round(total)}%
-    </text>
-    <text x={cx} y={cy + 14} text-anchor="middle" class="sub" fill="var(--muted)">dağılım</text>
+    {#if largest}
+      <text x={cx} y={cy - 8} text-anchor="middle" class="center" fill="var(--text)">
+        {((largest.value / total) * 100).toFixed(0)}%
+      </text>
+      <text x={cx} y={cy + 10} text-anchor="middle" class="clabel" fill="var(--text)">{largest.label}</text>
+      <text x={cx} y={cy + 24} text-anchor="middle" class="sub" fill="var(--muted)">{t('donutLargest')}</text>
+    {:else}
+      <text x={cx} y={cy + 4} text-anchor="middle" class="sub" fill="var(--muted)">{t('donutNoData')}</text>
+    {/if}
   </svg>
   <ul class="legend">
     {#each data as d (d.label)}
@@ -59,12 +69,16 @@
     flex-wrap: wrap;
   }
   .center {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
+  .clabel {
+    font-size: 12px;
+    font-weight: 600;
+  }
   .sub {
-    font-size: 10px;
+    font-size: 9px;
     fill: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.1em;

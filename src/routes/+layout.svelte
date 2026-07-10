@@ -3,29 +3,46 @@
   import {
     app,
     applyTheme,
-    hydrateFromHash,
-    syncHash
+    hydrateFromStorage,
+    syncStorage
   } from '$lib/state/appState.svelte';
+  import { initLocale, locale } from '$lib/i18n/state.svelte';
+  import { t } from '$lib/i18n';
   import IconSprite from '$lib/components/icons/IconSprite.svelte';
   import Topbar from '$lib/components/layout/Topbar.svelte';
   import Sidebar from '$lib/components/layout/Sidebar.svelte';
   import MobileDrawer from '$lib/components/layout/MobileDrawer.svelte';
   import ConceptModal from '$lib/components/ConceptModal.svelte';
+  import DecisionStrip from '$lib/components/layout/DecisionStrip.svelte';
+  import GuidedToggle from '$lib/components/layout/GuidedToggle.svelte';
 
   let { children } = $props();
   let drawerOpen = $state(false);
 
-  // İlk yüklemede hash'ten durumu geri yükle
-  hydrateFromHash();
+  // İlk yüklemede localStorage'dan (veya eski #d= hash'inden tek seferlik) durumu geri yükle
+  hydrateFromStorage();
   applyTheme();
+  initLocale();
 
-  // State değiştikçe hash'i güncelle (kalıcı olmayan, URL tabanlı durum)
+  // <html lang> özniteliğini locale ile senkron tut
+  $effect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('lang', locale.value);
+    }
+  });
+
+  // State değiştikçe localStorage'ı güncelle. URL temiz kalır; paylaşım
+  // yalnızca Share butonu üzerinden explicit tetiklenir.
   $effect(() => {
     void app.portfolio;
     void app.activeScenario;
     void app.finder;
     void app.guided;
-    syncHash();
+    void app.watchlist;
+    void app.decisionLog;
+    void app.currentTrade;
+    void app.eduDone;
+    syncStorage();
   });
 
   const year = new Date().getFullYear();
@@ -40,17 +57,21 @@
       <Sidebar />
     </aside>
     <main class="main">
-      {@render children()}
-      <footer class="footer">
-        <span>MarginCall — Eğitim amaçlı simülatör. Gerçek yatırım tavsiyesi değildir.</span>
-        <span>© {year}</span>
-      </footer>
+      <div class="page-container">
+        <DecisionStrip />
+        {@render children()}
+        <footer class="footer">
+          <span>{t('footerDisclaimer')}</span>
+          <span>© {year}</span>
+        </footer>
+      </div>
     </main>
   </div>
 </div>
 
 <MobileDrawer open={drawerOpen} onclose={() => (drawerOpen = false)} />
 <ConceptModal />
+<GuidedToggle />
 
 <style>
   .shell {
@@ -71,8 +92,7 @@
   }
   .main {
     min-width: 0;
-    padding: var(--space-8) var(--space-10);
-    max-width: 1200px;
+    padding-block: var(--space-8);
   }
   .footer {
     display: flex;
@@ -92,12 +112,12 @@
       display: none;
     }
     .main {
-      padding: var(--space-6) var(--space-6);
+      padding-block: var(--space-6);
     }
   }
   @media (max-width: 640px) {
     .main {
-      padding: var(--space-4);
+      padding-block: var(--space-4);
     }
     .footer {
       flex-direction: column;

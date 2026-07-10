@@ -4,17 +4,24 @@ import type {
   FinderConfig,
   FinderMode,
   ScenarioInput,
-  Sector
-} from './types';
-import { marketUniverse } from './market';
+  Sector,
+  Holding
+} from '$lib/engine/types';
+import type { CostModel } from '$lib/engine/settings/types';
+import { betaFor, sectorFor, getMarket } from './market';
 import { computeCosts } from './costs';
 import { erosionTimeline } from './scenario';
+import { t as _t } from '$lib/i18n';
+const t = _t as unknown as (key: string, params?: Record<string, unknown>) => string;
 
 interface FinderContext {
-  availableCollateral: number;
+  /** Merkezi collateral servisinden gelen kullanılabilir fon (profile'a göre) */
+  availableFunds: number;
   account: AccountParams;
   budget: number;
   sectorWeights: Record<string, number>;
+  universe: Holding[];
+  costModel: CostModel;
 }
 
 interface PerScenarioEval {
@@ -42,7 +49,8 @@ function evaluate(
     price,
     borrow,
     holdingDays: scenario.days,
-    rate: ctx.account.rate
+    rate: ctx.account.rate,
+    costModel: ctx.costModel
   });
   const netPL = (postPrice - price) * shares - costs.total;
 
@@ -52,7 +60,8 @@ function evaluate(
     borrow,
     dailyDrop: scenario.dailyDrop,
     days: scenario.days,
-    maintenanceMargin: ctx.account.maintenanceMargin
+    maintenanceMargin: ctx.account.maintenanceMargin,
+    rate: ctx.account.rate
   });
 
   return { bufferPct, netPL, mcDay };
@@ -102,15 +111,16 @@ export function runFinder(
       ? scenarios.filter((s) => s.name === activeScenarioName)
       : scenarios;
   const evalScenarios = scopeScenarios.length ? scopeScenarios : scenarios;
+  const resilienceTotal = evalScenarios.length;
 
   const candidates: FinderCandidate[] = [];
 
-  for (const stock of marketUniverse()) {
+  for (const stock of ctx.universe) {
     for (let lot = 1; lot <= config.maxLot; lot++) {
       const tradeValue = stock.price * lot;
       const requiredEquity = tradeValue * ctx.account.initialMargin;
-      const canOpen = ctx.availableCollateral >= requiredEquity;
-      const equity = Math.min(config.budget, tradeValue);
+      const canOpen = ctx.availableFunds >= requiredEquity;
+      const equity = Math.min(config.budget, tradeValue * ctx.account.initialMargin);
       if (!canOpen || equity <= 0) continue;
 
       const perScenario = evalScenarios.map((s) =>
@@ -151,7 +161,8 @@ export function runFinder(
         price: stock.price,
         borrow,
         holdingDays: 12,
-        rate: ctx.account.rate
+        rate: ctx.account.rate,
+        costModel: ctx.costModel
       });
 
       const w = modeWeights(config.mode);
@@ -178,20 +189,23 @@ export function runFinder(
       const status =
         minBuffer <= 0 ? 'danger' : minBuffer < 10 ? 'warning' : 'safe';
 
+      const resilience = buffers.filter((b) => b > 0).length;
+
       const diversifyNote =
         sectorWeight > 0.3
-          ? `${stock.sector} sektörü zaten %${(sectorWeight * 100).toFixed(
-              0
-            )} ağırlıkta — yoğunlaşmayı artırıyor`
+          ? t('finderRationaleConc', { sector: stock.sector, pct: (sectorWeight * 100).toFixed(0) })
           : sectorWeight === 0
-            ? `${stock.sector} yeni sektör — çeşitlendirme katkısı`
-            : `Mevcut ${stock.sector} ağırlığı düşük`;
+            ? t('finderRationaleNewSector', { sector: stock.sector })
+            : t('finderRationaleLowWeight', { sector: stock.sector });
+
+      const runway =
+        minMcDay < 0 ? t('simRunwayLong') : t('simMcDay', { day: minMcDay });
 
       const rationale = `Skor ${s.toFixed(
         1
       )} — buffer %${safety.toFixed(1)}, ${diversifyNote}, beta ${stock.beta.toFixed(
         1
-      )}, ${minMcDay < 0 ? 'runway uzun' : 'MC günü ' + minMcDay}.`;
+      )}, ${t('finderRationaleRunway', { runway })}.`;
 
       candidates.push({
         ticker: stock.ticker,
@@ -209,7 +223,9 @@ export function runFinder(
         score: s,
         bestInScenario: bestIn,
         status,
-        rationale
+        rationale,
+        resilience,
+        resilienceTotal
       });
     }
   }

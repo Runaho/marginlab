@@ -5,12 +5,15 @@
     color?: string;
   }
 
+  import { t } from '$lib/i18n';
+
   let {
     data,
     max = 100,
     unit = '',
-    height = 240
-  }: { data: Bar[]; max?: number; unit?: string; height?: number } = $props();
+    height = 240,
+    ariaLabel = t('chartBar')
+  }: { data: Bar[]; max?: number; unit?: string; height?: number; ariaLabel?: string } = $props();
 
   const W = 480;
   const padX = 16;
@@ -30,7 +33,7 @@
   }
 </script>
 
-<svg viewBox="0 0 {W} {height}" class="chart" role="img" preserveAspectRatio="xMidYMid meet">
+<svg viewBox="0 0 {W} {height}" class="chart" role="img" aria-label={ariaLabel} preserveAspectRatio="xMidYMid meet">
   <line x1={padX} y1={padTop + plotH} x2={W - padX} y2={padTop + plotH} stroke="var(--border)" stroke-width="1" />
   {#each data as d, i (d.label)}
     {@const bh = h(d.value)}

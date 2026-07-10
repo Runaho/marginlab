@@ -1,0 +1,50 @@
+[
+  {
+    "key": "initial",
+    "title": "Başlangıç Teminatı (Initial Margin)",
+    "body": "Bir pozisyonu margin ile açarken kendi cebinden koyman gereken minimum özkaynak oranıdır. ABD′de Reg T kuralıyla genelde %50′dir; yani 1.000$′lık hisse için en az 500$′ı sen koyarsın, kalanı broker kredisi olur. Formül: Gerekli Özkaynak = Pozisyon Değeri × Başlangıç Teminatı.",
+    "example": "Simülatörde \"Initial margin %\" kaydırıcısı bu oranı ayarlar. Açılışta gerekli özkaynak buradan hesaplanır."
+  },
+  {
+    "key": "maintenance",
+    "title": "Sürdürme Teminatı (Maintenance Margin)",
+    "body": "Pozisyon açıkken hesapta korunması gereken minimum özkaynak oranıdır. FINRA standartı uzun pozisyonlar için %25′tir; çoğu broker %25-30 arası \"house\" kuralı uygular. Özkaynak bu oranın altına düşerse margin call tetiklenir.",
+    "example": "Sürdürme %25 iken: Özkaynak < Piyasa Değeri × 0.25 olduğu an margin call başlar."
+  },
+  {
+    "key": "callprice",
+    "title": "Margin Call Fiyatı",
+    "body": "Pozisyonun sürdürme sınırını kırdığı hisse fiyatıdır. Formül: Call Fiyatı = Borç / (Adet × (1 − Sürdürme)). Fiyat bu seviyenin altına inerse aşağı çağrılırsın: ya nakit ekle ya pozisyonun bir kısmını sat.",
+    "example": "Simülatör sağ panelde call fiyatını ve güncel fiyata olan mesafeyi (buffer) gösterir."
+  },
+  {
+    "key": "buffer",
+    "title": "Buffer (Dayanıklılık Payı)",
+    "body": "Mevcut fiyat ile margin call fiyatı arasındaki yüzdesel mesafedir. Pozitif buffer, fiyatlar bu kadar düşmeden güvende olduğun anlamına gelir. Sıfır buffer = bugünkü fiyatta çağrılırsın. Negatif = zaten sorun desin.",
+    "example": "Dashboard′daki \"Margin Buffer\" KPI′sı ve simülatördeki uyarı kutusu buffer durumuna göre renk değiştirir."
+  },
+  {
+    "key": "collateral",
+    "title": "Teminat Değeri (Collateral)",
+    "body": "Eldeki hisselerin margin kapasitene yaptığı katkıdır. Broker her hissenin değerinin tamamını değil, belirli bir oranını (haircut) sayar; örneğin %75. Toplam kullanılabilir teminat = Nakit + ∑(Hisse Değeri × Teminat Oranı).",
+    "example": "Portföy sekmesinde her hissenin teminat oranını ayarlayabilirsin; bu, yeni trade′i açıp açamayacağını doğrudan etkiler."
+  },
+  {
+    "key": "concentration",
+    "title": "Yoğunlaşma Riski (Concentration)",
+    "body": "Tek bir pozisyonun veya sektörün portföyde aşırı ağırlıkta olmasıdır. Brokerlar yoğunlaşmış pozisyonlara ek haircut uygular. Ürün bunu sağlık skorunda ve bulucu′nun sektör cezasında açıkça gösterir.",
+    "example": "Bir hisse portföyün %40′ından fazlaysa kırmızı \"Yoğun\" etiketi yanar."
+  },
+  {
+    "key": "carry",
+    "title": "Taşıma Maliyeti (Carrying Cost)",
+    "body": "Margin borcunun yıllık faizidir. Sessiz yiyicidir: fiyat yerinde kalsa bile her gün borç faizi pozisyonu eritir. Aylık taşıma = Borç × Yıllık Faiz / 12.",
+    "example": "Maliyet dökümünde \"Margin faizi\" satırı ve senaryo grafiğinde flat (0%) senaryo bu maliyeti görünür kılar."
+  },
+  {
+    "key": "scenario",
+    "title": "Senaryo Stres Testi",
+    "body": "Pozisyonu ve mevcut portföyü aynı anda farkli piyasa ortamlarına sokarak ne kadar dayanacağını ölçer. \"Credit Stress\" gibi senaryolarda eldeki portföy düşer ama trade yerinde kalır — sessiz katil.",
+    "example": "Senaryolar sekmesinde 8 hazır senaryo kartı ve Bulucu′da \"tüm senaryoların en kötüsü\" modu bunu kullanır."
+  }
+]

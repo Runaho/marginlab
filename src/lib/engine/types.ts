@@ -8,6 +8,8 @@ export type Sector =
   | 'İletişim'
   | 'Diğer';
 
+import type { CollateralSource } from './marginProfile';
+
 export interface Holding {
   ticker: string;
   name: string;
@@ -20,6 +22,10 @@ export interface Holding {
   beta: number;
   /** Teminat oranı: bu pozisyonun değerinin ne kadarı margin kapasitesine sayılır (0-1) */
   collateral: number;
+  /** Teminat oranının kaynağı. Yoksa 'default-assumption'. */
+  collateralSource?: CollateralSource;
+  /** Gelişmiş Varsayımlar: kullanıcı bu pozisyonu collateral havuzundan hariç tuttu mu */
+  excludeFromCollateral?: boolean;
   sector: Sector;
 }
 
@@ -43,7 +49,26 @@ export interface EnrichedHolding extends Holding {
   weight: number;
   pl: number;
   plPct: number;
+  /** Efektif (haircut sonrası, profile'a göre) teminat değeri */
   collateralValue: number;
+  /** Eligibility'de kullanılan efektif oran (0-1) */
+  effectiveCollateralRate: number;
+  /** Görüntülenecek nominal oran (0-1) */
+  displayCollateralRate: number;
+  /** Çözümlenmiş kaynak (profile etkisi dahil) */
+  resolvedSource: CollateralSource;
+}
+
+/** Havuza katkı veren tek pozisyonun açıklanabilir kırılımı. */
+export interface HoldingCollateral {
+  ticker: string;
+  name: string;
+  value: number;
+  rate: number;
+  displayRate: number;
+  effectiveValue: number;
+  source: CollateralSource;
+  eligibility: 'eligible' | 'ineligible' | 'unknown';
 }
 
 export interface PortfolioStats {
@@ -52,12 +77,25 @@ export interface PortfolioStats {
   cash: number;
   total: number;
   cashRatio: number;
+  /** Menkul kıymet collateral (haircut sonrası) — geriye dönük uyum için collateralValue */
   collateralValue: number;
+  /** Nakit collateral (= cash) */
+  cashCollateral: number;
   availableCollateral: number;
+  /** Kullanılabilir fon (mevcut yükümlülükler düşülmüş) */
+  availableFunds: number;
+  /** Fazla likidite = özkaynak - sürdürme yükümlülüğü */
+  excessLiquidity: number;
+  /** Collateral havuzunun piyasa fiyatına bağlı payı (0-1) */
+  pctMarketDependent: number;
+  /** Havuza katkı veren pozisyonların açıklanabilir kırılımı */
+  perHoldingCollateral: HoldingCollateral[];
   buyingPower: number;
   weightedBeta: number;
   largest: EnrichedHolding | null;
   concentration: number;
+  /** Yoğunlaşma profil eşiğini aştı mı (bilgi amaçlı; oran otomatik düşürülmez) */
+  concentrationFlag: boolean;
   sectorWeights: Record<string, number>;
   health: number;
   healthNarrative: string;
@@ -74,6 +112,12 @@ export interface HealthAlert {
 
 export type MarginAlert = 'safe' | 'warning' | 'danger';
 
+/** Başlangıç teminatı karşılanma statüsü. */
+export type EligibilityStatus =
+  | 'covered-cash' // Nakit tek başına yeterli
+  | 'covered-securities' // Nakit düşük ama portföy collateral'ı ile karşılanıyor
+  | 'insufficient'; // Toplam teminat yetersiz
+
 export interface MarginResult {
   price: number;
   shares: number;
@@ -87,6 +131,17 @@ export interface MarginResult {
   canOpen: boolean;
   shortBy: number;
   availableCollateral: number;
+  /** Karar kırılımı */
+  cash: number;
+  securitiesCollateral: number;
+  totalCollateral: number;
+  availableFunds: number;
+  /** Trade sonrası kalan kullanılabilir collateral */
+  availableAfterTrade: number;
+  /** Yetersizse gereken ek collateral */
+  additionalNeeded: number;
+  cashSufficient: boolean;
+  eligibilityStatus: EligibilityStatus;
   alert: MarginAlert;
   rationale: string;
 }
@@ -112,19 +167,6 @@ export interface ScenarioInput {
   dailyDrop: number;
   /** Zaman dilimi (gün) */
   days: number;
-}
-
-export type ScenarioVerdict = 'Kontrollü' | 'Dikkat' | 'Kırılgan';
-
-export interface ScenarioResult {
-  newPrice: number;
-  newValue: number;
-  newEquityRatio: number;
-  cashPL: number;
-  marginPL: number;
-  verdict: ScenarioVerdict;
-  multiplier: number;
-  erosion: ErosionPoint[];
 }
 
 export interface ErosionPoint {
@@ -162,4 +204,24 @@ export interface FinderCandidate {
   bestInScenario: string;
   status: AlertLevel;
   rationale: string;
+  /** Kaç senaryoda sürdürme sınırının üzerinde kaldığı (dayanıklılık) */
+  resilience: number;
+  /** Değerlendirilen toplam senaryo sayısı */
+  resilienceTotal: number;
+}
+
+export interface WatchlistItem {
+  ticker: string;
+  addedAt: string;
+}
+
+export interface DecisionRecord {
+  ts: string;
+  ticker: string;
+  shares: number;
+  price: number;
+  bufferPct: number;
+  mode: FinderMode;
+  resilience: string;
+  scope: ScenarioScope;
 }

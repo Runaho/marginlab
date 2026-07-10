@@ -1,0 +1,161 @@
+{
+  "defaultAccount": {
+    "initialMargin": 0.5,
+    "maintenanceMargin": 0.25,
+    "rate": 0.08
+  },
+  "defaultCollateralRate": 0.75,
+  "defaultProfileId": "general",
+  "brokerProfiles": {
+    "general": {
+      "id": "general",
+      "label": "Genel Simülasyon",
+      "shortLabel": "Genel",
+      "description": "Eğitim amaçlı genel model. Uygun menkul kıymetler varsayımsal %75 oranıyla hesap seviyesinde teminata sayılır.",
+      "securitiesAsCollateral": true,
+      "securitiesRateFactor": 1,
+      "concentrationThreshold": 0.4
+    },
+    "cash-first": {
+      "id": "cash-first",
+      "label": "Nakit-öncelikli",
+      "shortLabel": "Nakit",
+      "description": "Muhafazakâr model. Menkul kıymetler teminat üretmez; yalnızca nakit kullanılabilir teminat sayılır.",
+      "securitiesAsCollateral": false,
+      "securitiesRateFactor": 0,
+      "concentrationThreshold": 0.4
+    },
+    "conservative": {
+      "id": "conservative",
+      "label": "Temkinli (indirimli oran)",
+      "shortLabel": "Temkinli",
+      "description": "Menkul kıymetler teminata sayılır ama daha düşük efektif oranla (nominal oranın ~2/3’ü). Haircut duyarlılığını göstermek içindir.",
+      "securitiesAsCollateral": true,
+      "securitiesRateFactor": 0.6667,
+      "concentrationThreshold": 0.4
+    }
+  },
+  "marginDisclaimer": "Seçili hesap profili ve collateral varsayımları ile hesaplandı. Gerçek broker oranları, uygunluk ve tasfiye koşulları farklı olabilir.",
+  "sectors": [
+    "Teknoloji",
+    "Finans",
+    "Enerji",
+    "Sağlık",
+    "Tüketim",
+    "Endüstriyel",
+    "İletişim",
+    "Diğer"
+  ],
+  "betaMap": {
+    "GFS": 1.6,
+    "AMKR": 1.4,
+    "ENTG": 1.5,
+    "QCOM": 1.3,
+    "NVDA": 1.75,
+    "KLAC": 1.4,
+    "MRVL": 1.6,
+    "ONTO": 1.5,
+    "ARM": 1.7,
+    "LRCX": 1.5,
+    "TER": 1.4,
+    "AVGO": 1.3,
+    "TSM": 1.2,
+    "WDC": 1.5,
+    "AMAT": 1.4,
+    "META": 1.3,
+    "MU": 1.7,
+    "ASML": 1.4
+  },
+  "defaultBeta": 1.3,
+  "sectorRules": {
+    "keywordMap": [
+      { "keywords": ["internet"], "sector": "İletişim" }
+    ],
+    "defaultSector": "Teknoloji"
+  },
+  "pdt": {
+    "equityThreshold": 25000,
+    "maxLeverage": 2
+  },
+  "concentration": {
+    "thresholds": [
+      { "minWeight": 0.4, "factor": 1.5 },
+      { "minWeight": 0.25, "factor": 1.25 }
+    ],
+    "defaultFactor": 1
+  },
+  "scenarios": [
+    {
+      "name": "Bull",
+      "description": "Güçlü yükseliş ortamı. Piyasa ve trade birlikte değer kazanır.",
+      "tradeShock": 0.3,
+      "portfolioShock": 0.15,
+      "dailyDrop": 0.0,
+      "days": 12
+    },
+    {
+      "name": "Hype",
+      "description": "Aşırı iyimserlik. Trade size abartılı prim yapar, portföy sadece hafif yükselir.",
+      "tradeShock": 0.45,
+      "portfolioShock": 0.05,
+      "dailyDrop": 0.0,
+      "days": 12
+    },
+    {
+      "name": "Low Dip",
+      "description": "Hafif düzeltme. Her şey yüzde 8 geriler.",
+      "tradeShock": -0.08,
+      "portfolioShock": -0.08,
+      "dailyDrop": -0.01,
+      "days": 12
+    },
+    {
+      "name": "Peak",
+      "description": "Zirve tükenmesi ~ S&P düzeltmesi Haziran 2022. Trade sert, portföy orta şok.",
+      "tradeShock": -0.28,
+      "portfolioShock": -0.15,
+      "dailyDrop": -0.03,
+      "days": 12
+    },
+    {
+      "name": "Slow Bleed",
+      "description": "Yavaş kanama. Uzun vadeli kademeli erime, günde %1 düşüş.",
+      "tradeShock": -0.18,
+      "portfolioShock": -0.18,
+      "dailyDrop": -0.01,
+      "days": 12
+    },
+    {
+      "name": "Credit Stress",
+      "description": "Sessiz katil. Mevcut portföy değer kaybeder, trade yerinde sayar.",
+      "tradeShock": 0.0,
+      "portfolioShock": -0.2,
+      "dailyDrop": 0.0,
+      "days": 12
+    },
+    {
+      "name": "Tech Selloff",
+      "description": "Teknoloji satışı ~ NASDAQ düzeltmesi Q4 2022. Teknoloji ağırlıklı portföyü vurur.",
+      "tradeShock": -0.22,
+      "portfolioShock": -0.25,
+      "dailyDrop": -0.02,
+      "days": 12
+    },
+    {
+      "name": "Recovery",
+      "description": "Toparlanma. Şok sonrası piyasa yeniden yükselişe geçer.",
+      "tradeShock": 0.18,
+      "portfolioShock": 0.12,
+      "dailyDrop": 0.0,
+      "days": 12
+    },
+    {
+      "name": "Flat",
+      "description": "Fiyat yerinde sayar. Sadece taşıma maliyeti (faiz) sessizce işler — kâr eşiği budur.",
+      "tradeShock": 0.0,
+      "portfolioShock": 0.0,
+      "dailyDrop": 0.0,
+      "days": 12
+    }
+  ]
+}
