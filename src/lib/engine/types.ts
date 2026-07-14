@@ -169,6 +169,95 @@ export interface ScenarioInput {
   days: number;
 }
 
+/** Bir gündeki fiyat değişim yüzdesi (basis noktası); path editor anchor'ları bu tipi paylaşır. */
+export interface AnchorPoint {
+  day: number;
+  changePct: number;
+}
+
+/**
+ * Senaryo girdi şeması — discriminated union.
+ * - `flat`: geleneksel (tradeShock + portfolioShock + dailyDrop + days); mevcut 9 predefined senaryo.
+ * - `path`: kullanıcı tanımlı günlük yol; tradePath + portfolioPath + interpolation + holdingPeriod.
+ *   Ara günler `flattenPathToDailyShocks` ile doldurulur.
+ */
+export type ScenarioSpec =
+  | { kind: 'flat'; tradeShock: number; portfolioShock: number; dailyDrop: number; days: number }
+  | { kind: 'path'; tradePath: AnchorPoint[]; portfolioPath: AnchorPoint[]; interpolation: 'linear' | 'step'; holdingPeriod: number };
+
+/** Preset verisini engine'in kabul ettiği spec'e çevirir. */
+export function presetToSpec(scenario: ScenarioInput): ScenarioSpec {
+  return {
+    kind: 'flat',
+    tradeShock: scenario.tradeShock,
+    portfolioShock: scenario.portfolioShock,
+    dailyDrop: scenario.dailyDrop,
+    days: scenario.days
+  };
+}
+
+/** Kullanıcı tanımlı senaryolar — discriminated union. mc-app-state'e `cs` alanında saklanır. */
+export type PathInterpolation = 'linear' | 'step';
+
+export interface UserScenarioSimple {
+  id: string;
+  kind: 'simple';
+  name: string;
+  tradeShock: number;
+  portfolioShock: number;
+  dailyDrop: number;
+  days: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserScenarioPath {
+  id: string;
+  kind: 'path';
+  name: string;
+  /** Eğer predefined senaryodan duplicate edildiyse o senaryonun adı. */
+  basedOnScenarioId: string | null;
+  tradePath: AnchorPoint[];
+  portfolioPath: AnchorPoint[];
+  interpolation: PathInterpolation;
+  holdingPeriod: number;
+  createdAt: string;
+  updatedAt: string;
+  settingsVersion: string;
+}
+
+export type UserScenario = UserScenarioSimple | UserScenarioPath;
+
+/** UserScenario → engine'in kabul ettiği ScenarioSpec'e çevirir. */
+export function userScenarioToSpec(s: UserScenario): ScenarioSpec {
+  if (s.kind === 'simple') {
+    return {
+      kind: 'flat',
+      tradeShock: s.tradeShock,
+      portfolioShock: s.portfolioShock,
+      dailyDrop: s.dailyDrop,
+      days: s.days
+    };
+  }
+  return {
+    kind: 'path',
+    tradePath: s.tradePath,
+    portfolioPath: s.portfolioPath,
+    interpolation: s.interpolation,
+    holdingPeriod: s.holdingPeriod
+  };
+}
+
+/** Validation bounds — settings-driven ileride; v1'de sabit. */
+export const SCENARIO_LIMITS = {
+  tradePctMin: -1,
+  tradePctMax: 3,
+  portfolioPctMin: -1,
+  portfolioPctMax: 2,
+  maxAnchorsPerPath: 50,
+  maxCustomScenarios: 20
+} as const;
+
 export interface ErosionPoint {
   day: number;
   equityRatio: number;

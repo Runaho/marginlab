@@ -1,10 +1,11 @@
 import { browser } from '$app/environment';
 import { DEFAULT_PORTFOLIO } from '../engine/presets';
-import type { DecisionRecord, FinderConfig, Holding, PortfolioData, WatchlistItem } from '../engine/types';
+import type { DecisionRecord, FinderConfig, Holding, PortfolioData, UserScenario, WatchlistItem } from '../engine/types';
 import type { BrokerProfileId } from '../engine/marginProfile';
 import { DEFAULT_PROFILE_ID, getProfile } from '../engine/marginProfile';
 import { DEFAULT_COLLATERAL_RATE } from '../engine/config';
 import { createLocalAppStateRepository, type AppStateShape, type WorkingTrade } from './portfolioRepository';
+import { SCENARIO_LIMITS } from '../engine/types';
 
 export type Theme = 'light' | 'dark';
 
@@ -15,6 +16,7 @@ export type Theme = 'light' | 'dark';
  * MarginCallMap okur. #d= base64 payload'ında da taşınır (Share için).
  */
 export type { WorkingTrade };
+export type { UserScenario };
 
 interface PersistShape {
   p: PortfolioData;
@@ -26,6 +28,9 @@ interface PersistShape {
   pr: BrokerProfileId;
   t: WorkingTrade | null;
   e: Record<number, boolean>;
+  cs: UserScenario[];
+  /** Custom senaryo aktif id; null veya yoksa app.activeScenario (preset adı) kullanılır. */
+  ac: string | null;
 }
 
 function loadTheme(): Theme {
@@ -44,6 +49,8 @@ const repo = createLocalAppStateRepository();
 export const app = $state({
   portfolio: clone(DEFAULT_PORTFOLIO) as PortfolioData,
   activeScenario: 'Peak',
+  /** Custom senaryo aktifse id'si; yoksa null ve app.activeScenario (preset adı) kullanılır. */
+  activeCustomScenarioId: null as string | null,
   finder: {
     budget: 300,
     riskTolerance: 'medium',
@@ -59,6 +66,7 @@ export const app = $state({
   watchlist: [] as WatchlistItem[],
   profile: DEFAULT_PROFILE_ID as BrokerProfileId,
   eduDone: {} as Record<number, boolean>,
+  customScenarios: [] as UserScenario[],
   /** true olduğunda UI küçük bir uyarı gösterebilir (örn. ayarlar sıfırlandı). */
   persistenceError: false
 });
@@ -210,6 +218,37 @@ export function isInWatchlist(ticker: string): boolean {
   return app.watchlist.some((w) => w.ticker === ticker);
 }
 
+/** Crypto-randomUUID polyfill (bazı eski tarayıcılar + SSR için deterministic fallback). */
+export function newScenarioId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'sc-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+/** Yeni custom scenario ekler. SCENARIO_LIMITS.maxCustomScenarios sınırını uygular. */
+export function addCustomScenario(s: UserScenario): { ok: boolean; reason?: 'limit' } {
+  if (app.customScenarios.length >= SCENARIO_LIMITS.maxCustomScenarios) {
+    return { ok: false, reason: 'limit' };
+  }
+  app.customScenarios = [...app.customScenarios, s];
+  return { ok: true };
+}
+
+export function updateCustomScenario(id: string, patch: Partial<UserScenario>): void {
+  app.customScenarios = app.customScenarios.map((s) =>
+    s.id === id ? ({ ...s, ...patch, id: s.id, updatedAt: new Date().toISOString() } as UserScenario) : s
+  );
+}
+
+export function removeCustomScenario(id: string): void {
+  app.customScenarios = app.customScenarios.filter((s) => s.id !== id);
+}
+
+export function getCustomScenario(id: string): UserScenario | undefined {
+  return app.customScenarios.find((s) => s.id === id);
+}
+
 function toPersistShape(): PersistShape {
   return {
     p: app.portfolio,
@@ -220,7 +259,9 @@ function toPersistShape(): PersistShape {
     w: app.watchlist,
     pr: app.profile,
     t: app.currentTrade,
-    e: app.eduDone
+    e: app.eduDone,
+    cs: app.customScenarios,
+    ac: app.activeCustomScenarioId
   };
 }
 
@@ -233,7 +274,12 @@ function applyShape(shape: PersistShape) {
   if (Array.isArray(shape.w)) app.watchlist = shape.w;
   if (shape.t && typeof shape.t === 'object') app.currentTrade = shape.t;
   if (shape.e && typeof shape.e === 'object') app.eduDone = shape.e as Record<number, boolean>;
+  if (Array.isArray(shape.cs)) app.customScenarios = shape.cs;
+  if (typeof shape.ac === 'string' || shape.ac === null) app.activeCustomScenarioId = shape.ac;
   app.profile = getProfile(shape.pr).id;
+  if (app.activeCustomScenarioId && !app.customScenarios.some((s) => s.id === app.activeCustomScenarioId)) {
+    app.activeCustomScenarioId = null;
+  }
 }
 
 /**

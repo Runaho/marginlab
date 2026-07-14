@@ -1,10 +1,16 @@
 <script lang="ts">
-  import { app, setActiveScenario } from '$lib/state/appState.svelte';
+  import {
+    app,
+    setActiveScenario,
+    addCustomScenario,
+    newScenarioId
+  } from '$lib/state/appState.svelte';
   import { settings } from '$lib/engine/settings/settingsStore.svelte';
   import { selectScenarioProjection } from '$lib/engine/selectors/selectScenarioProjection';
   import { selectMarginCallMap } from '$lib/engine/selectors/selectMarginCallMap';
   import { computeCosts, COST_LABELS } from '$lib/engine/costs';
   import { SCENARIOS } from '$lib/engine/presets';
+  import { presetToSpec, userScenarioToSpec, type ScenarioInput, type UserScenario, type ScenarioSpec } from '$lib/engine/types';
   import { groupedTickerOptions, groupedTickerGroups, getInstrument, betaFor, sectorFor } from '$lib/engine/market';
   import { DEFAULT_COLLATERAL_RATE } from '$lib/engine/marginProfile';
   import { openConcept } from '$lib/state/conceptStore';
@@ -18,9 +24,10 @@
   import AssumptionsChecklist from '$lib/components/ui/AssumptionsChecklist.svelte';
   import MarginCallMap from '$lib/components/MarginCallMap.svelte';
   import LineChart from '$lib/components/charts/LineChart.svelte';
+  import CustomScenarioBuilder from '$lib/components/scenarios/CustomScenarioBuilder.svelte';
+  import Icon from '$lib/components/icons/Icon.svelte';
 
-  // Trade parametreleri Simulator'dan gelir (working draft). Burada salt
-  // okunur gösterim — değişiklik için "Simulator'da düzenle" linkine git.
+  // Trade parametreleri Simulator'dan gelir (working draft).
   const ticker = $derived(app.currentTrade?.ticker ?? 'NVDA');
   const shares = $derived(app.currentTrade?.shares ?? 3);
   const additionalCash = $derived(app.currentTrade?.additionalCash ?? 0);
@@ -48,8 +55,54 @@
     };
   });
 
-  function projectFor(name: string) {
-    const s = SCENARIOS.find((x) => x.name === name)!;
+  // Unified view item: preset veya custom senaryoları tek listede gösterir.
+  interface ScenarioViewItem {
+    kind: 'preset' | 'custom';
+    /** Benzersiz kimlik; preset için 'preset:Bull', custom için 'custom:<id>'. */
+    key: string;
+    displayName: string;
+    description: string;
+    spec: ScenarioSpec;
+    /** Custom ise basedOnScenarioId (preset adı); null ise sıfırdan oluşturulmuş. */
+    basedOn: string | null;
+    /** Custom ise kendi UserScenario kaydı (delete için). */
+    customRef: UserScenario | null;
+  }
+
+  function presetToView(s: ScenarioInput): ScenarioViewItem {
+    return {
+      kind: 'preset',
+      key: 'preset:' + s.name,
+      displayName: s.name,
+      description: s.description,
+      spec: presetToSpec(s),
+      basedOn: null,
+      customRef: null
+    };
+  }
+
+  function customToView(u: UserScenario): ScenarioViewItem {
+    const desc =
+      u.kind === 'simple'
+        ? `Trade ${fmtPct(u.tradeShock * 100, 0)} · Portfolio ${fmtPct(u.portfolioShock * 100, 0)} · ${u.days}d`
+        : `Path · ${u.tradePath.length} anchors · ${u.holdingPeriod}d`;
+    return {
+      kind: 'custom',
+      key: 'custom:' + u.id,
+      displayName: u.name,
+      description: desc,
+      spec: userScenarioToSpec(u),
+      basedOn: u.kind === 'path' ? u.basedOnScenarioId : null,
+      customRef: u
+    };
+  }
+
+  const viewItems = $derived<ScenarioViewItem[]>([
+    ...app.customScenarios.map(customToView),
+    ...SCENARIOS.map(presetToView)
+  ]);
+
+  function projectSpec(spec: ScenarioSpec) {
     return selectScenarioProjection({
       cash: app.portfolio.cash,
       holdings: app.portfolio.holdings,
@@ -58,40 +111,50 @@
       holdingDays,
       profileId,
       settings,
-      scenario: {
-        // dailyDrop === 0 → "Flat" senaryosu: fiyat sabit, sadece faiz birikir.
-        // -0.03 fallback kaldırıldı (Phase 2: P1-13).
-        dailyDrop: s.dailyDrop,
-        tradeShock: s.tradeShock,
-        portfolioShock: s.portfolioShock,
-        holdingPeriod: s.days
-      }
+      spec
     });
   }
 
-  function classify(p: ReturnType<typeof projectFor>): 'controlled' | 'watch' | 'fragile' | 'unknown' {
+  function classify(p: ReturnType<typeof projectSpec>): 'controlled' | 'watch' | 'fragile' | 'unknown' {
     if (p.calculationStatus === 'insufficient-data' || p.calculationStatus === 'calculation-error') return 'unknown';
     if (p.marginCallDay >= 0) return 'fragile';
     const ew = p.days.some((d) => d.day > 0 && d.riskStatus === 'early-warning');
     return ew ? 'watch' : 'controlled';
   }
 
-  const results = $derived(SCENARIOS.map((s) => {
-    const p = projectFor(s.name);
-    return { scenario: s, projection: p, verdict: classify(p) };
-  }));
+  const results = $derived(
+    viewItems.map((v) => {
+      const p = projectSpec(v.spec);
+      return { item: v, projection: p, verdict: classify(p) };
+    })
+  );
 
-  const active = $derived(results.find((x) => x.scenario.name === app.activeScenario) ?? results[0]);
+  // Aktif senaryo belirleme: hem preset adı hem custom id ile eşleşebilir.
+  const active = $derived.by(() => {
+    if (app.activeCustomScenarioId) {
+      const m = results.find((r) => r.item.kind === 'custom' && r.item.customRef?.id === app.activeCustomScenarioId);
+      if (m) return m;
+    }
+    const m = results.find((r) => r.item.kind === 'preset' && r.item.displayName === app.activeScenario);
+    return m ?? results[0];
+  });
+
   const matrix = $derived(
     selectMarginCallMap({ cash: app.portfolio.cash, holdings: app.portfolio.holdings, trade: tradeSpec, additionalCash, profileId, settings })
   );
+
+  // Compute costs — aktif senaryonun holdingPeriod'unu kullan (custom path veya preset days).
+  const activeHoldingDays = $derived.by(() => {
+    const v = active.item;
+    return v.spec.kind === 'flat' ? v.spec.days : v.spec.holdingPeriod;
+  });
 
   const costs = $derived(
     computeCosts({
       shares,
       price,
-      borrow: active.projection.days[0].debitBalance,
-      holdingDays: active.scenario.days,
+      borrow: active.projection.days[0]?.debitBalance ?? 0,
+      holdingDays: activeHoldingDays,
       rate: annualRate,
       costModel: settings.costModel
     })
@@ -117,8 +180,6 @@
 
   let showDaily = $state(false);
 
-  // Phase 2: profil değeri tek kaynak (scenarioEngine.riskThresholds.earlyWarningBufferRate
-  // artık classifyRisk tarafından okunmuyor; profilin değeri kullanılıyor).
   const ewPct = $derived(settings.accountProfiles[profileId].earlyWarningBufferRate * 100);
 
   const chartPoints = $derived(
@@ -129,20 +190,20 @@
     }))
   );
 
-  function statusText(p: ReturnType<typeof projectFor>): string {
+  function statusText(p: ReturnType<typeof projectSpec>): string {
     if (p.calculationStatus === 'insufficient-data') return t('scenStatusInsufficientData');
     if (p.calculationStatus === 'calculation-error') return t('scenStatusCalculationError');
     if (p.calculationStatus === 'no-margin-call-within-horizon') return t('scenStatusNoMcHorizon');
     return p.marginCallDay > 0 ? t('scenMcDayCalculated', { day: p.marginCallDay }) : t('scenStatusNoMcHorizon');
   }
 
-  function cardWhy(x: (typeof results)[number]): string {
-    const minB = x.projection.minBufferPct;
+  function cardWhy(p: ReturnType<typeof projectSpec>): string {
+    const minB = p.minBufferPct;
     const ew = settings.scenarioEngine.riskThresholds.earlyWarningBufferRate * 100;
-    if (x.projection.calculationStatus === 'insufficient-data') return t('scenStatusInsufficientData');
-    if (x.projection.calculationStatus === 'calculation-error') return t('scenStatusCalculationError');
-    if (x.projection.marginCallDay > 0) {
-      return t('scenMcDayCalculated', { day: x.projection.marginCallDay });
+    if (p.calculationStatus === 'insufficient-data') return t('scenStatusInsufficientData');
+    if (p.calculationStatus === 'calculation-error') return t('scenStatusCalculationError');
+    if (p.marginCallDay > 0) {
+      return t('scenMcDayCalculated', { day: p.marginCallDay });
     }
     if (minB !== null && minB < ew) {
       const dist = Math.max(0, ew - minB);
@@ -150,6 +211,68 @@
     }
     if (minB !== null) return t('scenCardMinBuffer', { pct: minB.toFixed(0) });
     return t('scenStatusNoMcHorizon');
+  }
+
+  function cardSubtitle(v: ScenarioViewItem): string {
+    if (v.kind === 'preset') {
+      const flat = v.spec as Extract<ScenarioSpec, { kind: 'flat' }>;
+      return t('scenCardShock', { trade: fmtPct(flat.tradeShock * 100, 0), portfolio: fmtPct(flat.portfolioShock * 100, 0) });
+    }
+    return v.description;
+  }
+
+  function selectItem(v: ScenarioViewItem) {
+    if (v.kind === 'preset') {
+      setActiveScenario(v.displayName);
+      app.activeCustomScenarioId = null;
+    } else {
+      app.activeCustomScenarioId = v.customRef?.id ?? null;
+      setActiveScenario('Peak');
+    }
+  }
+
+  function duplicatePresetAsCustom(s: ScenarioInput) {
+    // Custom scenario'yu "path" kind'ında oluştur (preset'ten duplicate edildi).
+    const id = newScenarioId();
+    const now = new Date().toISOString();
+    const tradePath = flatToPath(s.tradeShock, s.days, s.dailyDrop);
+    const portfolioPath = flatToPath(s.portfolioShock, s.days, s.dailyDrop);
+    const newCustom: UserScenario = {
+      id,
+      kind: 'path',
+      name: `${s.name} (custom)`,
+      basedOnScenarioId: s.name,
+      tradePath,
+      portfolioPath,
+      interpolation: 'linear',
+      holdingPeriod: s.days,
+      createdAt: now,
+      updatedAt: now,
+      settingsVersion: '2'
+    };
+    addCustomScenario(newCustom);
+    app.activeCustomScenarioId = id;
+    setActiveScenario('Peak');
+  }
+
+  /**
+   * Preset senaryoyu path anchor listesine çevirir.
+   * dailyDrop != 0 ise: day 0 = 0, day = days = dailyDrop * days son nokta (compound yerine direkt toplam etki).
+   * dailyDrop == 0 ise: ani şok — day 0 = 0, day 1 = tradeShock, day = days = tradeShock (step).
+   */
+  function flatToPath(shock: number, days: number, dailyDrop: number): { day: number; changePct: number }[] {
+    if (dailyDrop !== 0) {
+      const endPct = Math.pow(1 + dailyDrop, days) - 1;
+      return [
+        { day: 0, changePct: 0 },
+        { day: days, changePct: endPct }
+      ];
+    }
+    return [
+      { day: 0, changePct: 0 },
+      { day: 1, changePct: shock },
+      { day: days, changePct: shock }
+    ];
   }
 </script>
 
@@ -181,39 +304,71 @@
   <Badge kind="alert" level="success" label={`${resilience.controlled} ${t('verdictControlled')}`} />
   <Badge kind="alert" level="warning" label={`${resilience.watch} ${t('verdictWatch')}`} />
   <Badge kind="alert" level="danger" label={`${resilience.fragile} ${t('verdictFragile')}`} />
-  <span class="rs-note">{t('scenResilienceNote', { count: SCENARIOS.length, safe: resilience.controlled })}</span>
+  <span class="rs-note">{t('scenResilienceNote', { count: results.length, safe: resilience.controlled })}</span>
 </div>
 
 <div class="cards">
-  {#each results as x (x.scenario.name)}
-    <button class="scard" class:active={x.scenario.name === app.activeScenario} onclick={() => setActiveScenario(x.scenario.name)}>
-      <div class="sc-top">
-        <span class="sc-name">{x.scenario.name}</span>
-        <Badge level={verdictLevel(x.verdict)} label={verdictLabel(x.verdict)} />
-      </div>
-      <div class="sc-shock">
-        {t('scenCardShock', { trade: fmtPct(x.scenario.tradeShock * 100, 0), portfolio: fmtPct(x.scenario.portfolioShock * 100, 0) })}
-      </div>
-      <div class="sc-pl tabular">{statusText(x.projection)}</div>
-      <div class="sc-why">{t('scenCardWhy')}: {cardWhy(x)}</div>
-    </button>
+  {#each results as x (x.item.key)}
+    {@const isActive = x.item.kind === 'preset'
+      ? x.item.displayName === app.activeScenario && !app.activeCustomScenarioId
+      : x.item.customRef?.id === app.activeCustomScenarioId}
+    <div class="scard" class:active={isActive}>
+      <button class="scard-main" type="button" onclick={() => selectItem(x.item)} aria-pressed={isActive}>
+        <div class="sc-top">
+          <span class="sc-name">
+            {#if x.item.kind === 'custom'}
+              <Icon name="shield-check" size={12} /> {x.item.displayName}
+            {:else}
+              {x.item.displayName}
+            {/if}
+          </span>
+          <Badge level={verdictLevel(x.verdict)} label={verdictLabel(x.verdict)} />
+        </div>
+        <div class="sc-shock">{cardSubtitle(x.item)}</div>
+        <div class="sc-pl tabular">{statusText(x.projection)}</div>
+        <div class="sc-why">{t('scenCardWhy')}: {cardWhy(x.projection)}</div>
+      </button>
+      {#if x.item.kind === 'preset'}
+        {@const flatSpec = x.item.spec.kind === 'flat' ? x.item.spec : null}
+        {#if flatSpec}
+          <button
+            type="button"
+            class="dup"
+            aria-label={t('simDuplicateAria', { name: x.item.displayName })}
+            title={t('simDuplicateTitle')}
+            onclick={() => duplicatePresetAsCustom({
+              name: x.item.displayName,
+              description: x.item.description,
+              tradeShock: flatSpec.tradeShock,
+              portfolioShock: flatSpec.portfolioShock,
+              dailyDrop: flatSpec.dailyDrop,
+              days: flatSpec.days
+            })}
+          >
+            <Icon name="plus" size={12} /> {t('simDuplicate')}
+          </button>
+        {/if}
+      {/if}
+    </div>
   {/each}
 </div>
+
+<CustomScenarioBuilder />
 
 <p class="role-sep">{t('scenResilienceIntro')}</p>
 
 <section class="card stress">
   <div class="card-head">
-    <h3>{t('scenStressTitle', { name: active.scenario.name })}</h3>
+    <h3>{t('scenStressTitle', { name: active.item.displayName })}</h3>
     <Badge
       level={verdictLevel(active.verdict)}
       label={verdictLabel(active.verdict)}
     />
   </div>
-  <p class="desc">{active.scenario.description} {t('scenStressDesc')}</p>
+  <p class="desc">{active.item.description} {t('scenStressDesc')}</p>
   <div class="pt-grid">
-    <div class="pt"><span>{t('scenPostShockValue')}</span><strong class="tabular">{fmtMoney(active.projection.days[active.projection.days.length - 1].portfolioValue)}</strong></div>
-    <div class="pt"><span>{t('simNewMaint')}</span><strong class="tabular">{fmtMoney(active.projection.days[active.projection.days.length - 1].maintenanceReq)}</strong></div>
+    <div class="pt"><span>{t('scenPostShockValue')}</span><strong class="tabular">{fmtMoney(active.projection.days[active.projection.days.length - 1]?.portfolioValue ?? 0)}</strong></div>
+    <div class="pt"><span>{t('simNewMaint')}</span><strong class="tabular">{fmtMoney(active.projection.days[active.projection.days.length - 1]?.maintenanceReq ?? 0)}</strong></div>
     <div class="pt"><span>{t('simMcDayLabel')}</span><strong class="tabular" class:neg={active.projection.marginCallDay >= 0}>{statusText(active.projection)}</strong></div>
   </div>
 
@@ -253,10 +408,10 @@
 
 <section class="card detail">
   <div class="card-head">
-    <h3>{t('scenDetailTitle', { name: active.scenario.name })}</h3>
+    <h3>{t('scenDetailTitle', { name: active.item.displayName })}</h3>
     <Badge level={verdictLevel(active.verdict)} label={verdictLabel(active.verdict)} />
   </div>
-  <p class="desc">{active.scenario.description}</p>
+  <p class="desc">{active.item.description}</p>
 
   <div class="split">
     <div class="split-box">
@@ -271,7 +426,7 @@
       <div class="sb-sub">{t('scenEwSub', { pct: ewPct.toFixed(0) })}</div>
     </div>
     <div class="split-box">
-      <div class="sb-label">{t('simEstInterestDays', { days: active.scenario.days })}</div>
+      <div class="sb-label">{t('simEstInterestDays', { days: activeHoldingDays })}</div>
       <div class="sb-val tabular" class:neg={costs.total > 0}>{fmtMoney(costs.total)}</div>
       <div class="sb-sub">
         {#each Object.entries(costs).filter(([k]) => k !== 'total') as [k, v] (k)}
@@ -280,7 +435,7 @@
     </div>
   </div>
 
-  <WarningBox level={verdictLevel(active.verdict)} title={verdictLabel(active.verdict)} detail={active.scenario.name === 'Flat' ? t('scenFlatNote') : active.verdict === 'fragile' ? t('scenFragileNote') : active.verdict === 'watch' ? t('scenWatchNote') : t('scenSafeNote')} />
+  <WarningBox level={verdictLevel(active.verdict)} title={verdictLabel(active.verdict)} detail={active.item.displayName === 'Flat' ? t('scenFlatNote') : active.verdict === 'fragile' ? t('scenFragileNote') : active.verdict === 'watch' ? t('scenWatchNote') : t('scenSafeNote')} />
   <AssumptionsChecklist />
   <p class="profile-note">{t('simProfileNote', { name: settings.accountProfiles[profileId].name })}. {marginDisclaimer()}</p>
 </section>
@@ -362,24 +517,50 @@
     margin-bottom: var(--space-6);
   }
   .scard {
+    position: relative;
     text-align: left;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: var(--space-4);
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
     transition: border-color 180ms ease, transform 180ms var(--ease);
   }
-  .scard:hover {
-    transform: translateY(-2px);
-  }
+  .scard:hover { transform: translateY(-2px); }
   .scard.active {
     border-color: var(--text);
     box-shadow: inset 0 0 0 1px var(--text);
   }
+  .scard-main {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: var(--space-4);
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+  }
+  .scard.active .scard-main { color: inherit; }
+  .dup {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 7px;
+    font-size: 10px;
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+  .scard:hover .dup, .scard:focus-within .dup { opacity: 1; }
+  .dup:hover { color: var(--text); border-color: var(--text); }
   .sc-top {
     display: flex;
     justify-content: space-between;
@@ -388,6 +569,9 @@
   .sc-name {
     font-family: var(--font-display);
     font-size: 19px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
   .sc-shock {
     font-size: 12px;

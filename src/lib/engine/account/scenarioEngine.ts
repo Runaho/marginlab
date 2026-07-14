@@ -1,4 +1,4 @@
-import type { Holding, AccountParams, Sector } from '../types';
+import type { AccountParams, AnchorPoint, Holding, ScenarioSpec, Sector } from '../types';
 import type { AccountProfile, CollateralRisk, CostModel, ScenarioRiskThresholds } from '../settings/types';
 import { calculateCollateral, type CollateralState } from './collateralEngine';
 import { estimateDebitLedger, type DebitLedgerResult } from './debitLedger';
@@ -135,8 +135,67 @@ export function computeCombined(
   };
 }
 
+/**
+ * Path'i (sorted anchor listesi) günlere dağıtır.
+ * - `day 0` her zaman `0` (locked).
+ * - Anchor'lar day artan sırada olmalı; duplicate varsa sonuncusu kazanır (defensive).
+ * - `step` interpolasyonu: bir sonraki anchor'a kadar sabit.
+ * - `linear` interpolasyonu: iki anchor arasında lineer geçiş.
+ * - Son anchor'dan sonraki günler son anchor'un değerini korur (extend).
+ */
+export function flattenPathToDailyShocks(
+  path: AnchorPoint[],
+  days: number,
+  method: 'linear' | 'step'
+): number[] {
+  const out: number[] = new Array(Math.max(0, days) + 1).fill(0);
+  out[0] = 0;
+  if (days <= 0) return out;
+
+  // Sorted unique anchors; day 0 force 0; anchor.day > days clamp edilir (defensive).
+  const sorted = [...path]
+    .filter((p) => p && isFinite(p.day) && isFinite(p.changePct))
+    .sort((a, b) => a.day - b.day);
+  // Day 0 anchor'unu yok say (locked 0).
+  const anchors = sorted.filter((p) => p.day > 0 && p.day <= days).map((p) => ({ day: p.day, changePct: p.changePct }));
+
+  if (anchors.length === 0) {
+    // Tüm günler 0 (Flat). out zaten 0 dolu.
+    return out;
+  }
+
+  if (method === 'step') {
+    let cur = 0;
+    for (let d = 1; d <= days; d++) {
+      while (cur < anchors.length && anchors[cur].day <= d) cur++;
+      // cur = ilk anchor index'i d'den büyük olan; [cur-1].changePct uygulanır.
+      out[d] = anchors[Math.max(0, cur - 1)].changePct;
+    }
+    return out;
+  }
+
+  // linear
+  let idx = 0;
+  for (let d = 1; d <= days; d++) {
+    // d'yi kapsayan anchor aralığını bul.
+    while (idx < anchors.length - 1 && anchors[idx + 1].day < d) idx++;
+    const a = anchors[idx];
+    const b = anchors[Math.min(idx + 1, anchors.length - 1)];
+    if (a.day === d) {
+      out[d] = a.changePct;
+    } else if (b.day === a.day) {
+      out[d] = a.changePct;
+    } else {
+      const span = b.day - a.day;
+      const ratio = span > 0 ? (d - a.day) / span : 0;
+      out[d] = a.changePct + (b.changePct - a.changePct) * ratio;
+    }
+  }
+  return out;
+}
+
 export interface ProjectScenarioInput extends CombinedInput {
-  scenario: { dailyDrop: number; tradeShock: number; portfolioShock: number; holdingPeriod: number };
+  spec: ScenarioSpec;
   holdingDays: number;
 }
 
@@ -150,14 +209,55 @@ export function projectScenario(input: ProjectScenarioInput): ScenarioProjection
     policy: input.profile.fundingPolicy
   });
 
-  const days = Math.max(1, input.scenario.holdingPeriod || input.holdingDays || 30);
-  const useDaily = input.scenario.dailyDrop !== 0;
+  // Spec'ten gün sayısı ve günlük çarpanlar.
+  const days = Math.max(
+    1,
+    input.spec.kind === 'flat'
+      ? input.spec.days
+      : input.spec.holdingPeriod || input.holdingDays || 30
+  );
+
+  let tradeDaily: number[]; // [0..days]; indeks d = gün d'nin trade priceMult'ı (1 + changePct).
+  let portDaily: number[];
+  if (input.spec.kind === 'flat') {
+    const useDaily = input.spec.dailyDrop !== 0;
+    tradeDaily = new Array(days + 1).fill(1);
+    portDaily = new Array(days + 1).fill(1);
+    if (useDaily) {
+      // Compound: her gün (1 + dailyDrop)^d. Phase 2 kararı: trade ve portföy aynı oranla bileşik.
+      // Spec burada flat olduğu için trade ve portföy tradeShock/portfolioShock gün 0'da uygulanmaz;
+      // sadece bileşik compound uygulanır.
+      for (let d = 1; d <= days; d++) {
+        tradeDaily[d] = Math.pow(1 + input.spec.dailyDrop, d);
+        portDaily[d] = Math.pow(1 + input.spec.dailyDrop, d);
+      }
+    } else {
+      // Ani şok: gün 0 baz, gün ≥1 tradeShock ve portfolioShock uygulanır.
+      for (let d = 1; d <= days; d++) {
+        tradeDaily[d] = 1 + input.spec.tradeShock;
+        portDaily[d] = 1 + input.spec.portfolioShock;
+      }
+    }
+  } else {
+    // path: her seriyi kendi path'inden günlere yay.
+    tradeDaily = flattenPathToDailyShocks(
+      input.spec.tradePath,
+      days,
+      input.spec.interpolation
+    ).map((pct) => 1 + pct);
+    portDaily = flattenPathToDailyShocks(
+      input.spec.portfolioPath,
+      days,
+      input.spec.interpolation
+    ).map((pct) => 1 + pct);
+  }
+
   const points: ScenarioDayPoint[] = [];
   let marginCallDay = -1;
   let earlyWarningDay = -1;
   let minBufferPct: number | null = null;
 
-  // Veri eksikliği erken tespit: trade fiyatı 0 veya negatif ya da pay adedi yoksa hesaplanamaz.
+  // Veri eksikliği erken tespit.
   if (!isFinite(input.trade.price) || input.trade.price <= 0 || !isFinite(input.trade.shares) || input.trade.shares <= 0) {
     return {
       days: [],
@@ -170,16 +270,8 @@ export function projectScenario(input: ProjectScenarioInput): ScenarioProjection
   }
 
   for (let d = 0; d <= days; d++) {
-    let tradeMult: number;
-    let portMult: number;
-    if (useDaily) {
-      tradeMult = Math.pow(1 + input.scenario.dailyDrop, d);
-      portMult = Math.pow(1 + input.scenario.dailyDrop, d);
-    } else {
-      // Ani şok senaryosu: gün 0 baz (mult=1), sonrası şok uygulanır.
-      tradeMult = d === 0 ? 1 : 1 + input.scenario.tradeShock;
-      portMult = d === 0 ? 1 : 1 + input.scenario.portfolioShock;
-    }
+    const tradeMult = tradeDaily[d] ?? 1;
+    const portMult = portDaily[d] ?? 1;
     const accrued = totalInterest(ledger.estimatedDebitBalance, input.account.rate, d);
     const r = computeCombined(input, tradeMult, portMult, ledger, accrued) as ScenarioDayPoint;
     r.day = d;

@@ -15,7 +15,8 @@ Svelte 5′in `.svelte.ts` dosyasında modül seviyesinde `$state` kullanır.
 ```ts
 app = $state({
   portfolio: PortfolioData,             // holdings + cash + account
-  activeScenario: string,               // senaryo adı
+  activeScenario: string,               // aktif preset senaryo adı (veya fallback)
+  activeCustomScenarioId: string | null, // aktif custom senaryo id (varsa)
   finder: FinderConfig,                 // bulucu filtreleri
   guided: boolean,                      // rehber modu açık mı
   theme: 'light' | 'dark',
@@ -23,6 +24,7 @@ app = $state({
   decisionLog: DecisionRecord[],        // Finder onay kayıtları (max 20)
   watchlist: WatchlistItem[],
   eduDone: Record<number, boolean>,     // education step tamamlanma durumu
+  customScenarios: UserScenario[],      // kullanıcı tanımlı senaryolar (max 20)
   persistenceError: boolean             // quota aşımı sinyali
 })
 ```
@@ -37,6 +39,16 @@ interface WorkingTrade {
   updatedAt: string; // ISO
 }
 ```
+
+`UserScenario` discriminated union (`engine/types.ts`):
+```ts
+type UserScenario =
+  | { kind: 'simple'; tradeShock, portfolioShock, dailyDrop, days, ... }
+  | { kind: 'path'; tradePath: AnchorPoint[]; portfolioPath: AnchorPoint[];
+      interpolation: 'linear'|'step'; holdingPeriod; ... };
+```
+
+> **Aktif senaryo seçimi:** `app.activeCustomScenarioId` null değilse custom senaryo aktiftir; aksi halde `app.activeScenario` (preset adı) kullanılır. Her iki alan da `PersistShape`'te saklanır.
 
 ### Ana Fonksiyonlar
 | Fonksiyon | Ne yapar |

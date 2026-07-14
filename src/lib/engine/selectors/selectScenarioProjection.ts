@@ -1,4 +1,4 @@
-import type { Holding } from '../types';
+import type { Holding, ScenarioSpec } from '../types';
 import type { Settings } from '../settings/types';
 import type { BrokerProfileId } from '../marginProfile';
 import { resolveProfile, resolveAccountParams, resolveCollateralRisk } from '../account/settingsResolver';
@@ -12,7 +12,7 @@ export function selectScenarioProjection(input: {
   holdingDays: number;
   profileId: BrokerProfileId;
   settings: Settings;
-  scenario: { dailyDrop: number; tradeShock: number; portfolioShock: number; holdingPeriod: number };
+  spec: ScenarioSpec;
 }): ScenarioProjection {
   const profile = resolveProfile(input.settings, input.profileId);
   const account = resolveAccountParams(input.settings, input.profileId);
@@ -28,5 +28,5 @@ export function selectScenarioProjection(input: {
     costModel: input.settings.costModel,
     earlyWarningThresholds: input.settings.scenarioEngine.riskThresholds
   };
-  return projectScenario({ ...combined, scenario: input.scenario, holdingDays: input.holdingDays });
+  return projectScenario({ ...combined, spec: input.spec, holdingDays: input.holdingDays });
 }

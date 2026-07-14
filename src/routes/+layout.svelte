@@ -36,12 +36,14 @@
   $effect(() => {
     void app.portfolio;
     void app.activeScenario;
+    void app.activeCustomScenarioId;
     void app.finder;
     void app.guided;
     void app.watchlist;
     void app.decisionLog;
     void app.currentTrade;
     void app.eduDone;
+    void app.customScenarios;
     syncStorage();
   });
 

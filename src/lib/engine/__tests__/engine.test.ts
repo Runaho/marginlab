@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Holding, Sector } from '../types';
+import type { Holding, ScenarioSpec, Sector } from '../types';
 import { seedSettings } from '../settings/defaults';
 import { validateSettings } from '../settings/validate';
 import type { Settings } from '../settings/types';
@@ -7,6 +7,7 @@ import { selectTradeImpact } from '../selectors/selectTradeImpact';
 import { selectAccountSnapshot } from '../selectors/selectAccountSnapshot';
 import { selectScenarioProjection } from '../selectors/selectScenarioProjection';
 import { selectMarginCallMap } from '../selectors/selectMarginCallMap';
+import { flattenPathToDailyShocks } from '../account/scenarioEngine';
 import type { TradeSpec } from '../account/scenarioEngine';
 
 function holding(ticker: string, shares: number, price: number, sector: Sector = 'Teknoloji'): Holding {
@@ -113,7 +114,7 @@ describe('Spec §8.4 — Portföy şoku', () => {
       holdingDays: 12,
       profileId: 'general',
       settings,
-      scenario: { dailyDrop: 0, tradeShock: 0, portfolioShock: -0.3, holdingPeriod: 1 }
+      spec: { kind: 'flat', dailyDrop: 0, tradeShock: 0, portfolioShock: -0.3, days: 1 },
     });
     const day0 = proj.days[0];
     const terminal = proj.days[proj.days.length - 1];
@@ -136,7 +137,7 @@ describe('Spec §8.5 — Yeni trade şoku', () => {
       holdingDays: 12,
       profileId: 'general',
       settings,
-      scenario: { dailyDrop: 0, tradeShock: -0.4, portfolioShock: 0, holdingPeriod: 1 }
+      spec: { kind: 'flat', dailyDrop: 0, tradeShock: -0.4, portfolioShock: 0, days: 1 }
     });
     const day0 = proj.days[0];
     const terminal = proj.days[proj.days.length - 1];
@@ -158,7 +159,7 @@ describe('Spec §8.6 — Birleşik şok + interest', () => {
       holdingDays: 30,
       profileId: 'general',
       settings,
-      scenario: { dailyDrop: -0.02, tradeShock: 0, portfolioShock: 0, holdingPeriod: 30 }
+      spec: { kind: 'flat', dailyDrop: -0.02, tradeShock: 0, portfolioShock: 0, days: 30 }
     });
     const last = proj.days[proj.days.length - 1];
     expect(last.accruedInterest).toBeGreaterThan(0);
@@ -268,5 +269,73 @@ describe('Margin Call Haritası (şok matrisi)', () => {
     expect(matrix.cells[0].length).toBeGreaterThan(0);
     const flat = matrix.cells.flat();
     expect(flat.some((c) => c.riskStatus === 'controlled')).toBe(true);
+  });
+});
+
+describe('flattenPathToDailyShocks — Path → daily shock dizisi', () => {
+  it('boş path tüm günler 0', () => {
+    expect(flattenPathToDailyShocks([], 5, 'linear')).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  it('day 0 her zaman 0', () => {
+    const r = flattenPathToDailyShocks([{ day: 0, changePct: -50 }, { day: 5, changePct: -50 }], 5, 'linear');
+    expect(r[0]).toBe(0);
+  });
+
+  it('tek anchor step modunda tüm günlere yayılır', () => {
+    // day 5 = -50; step: day ≥5 hep -50
+    const r = flattenPathToDailyShocks([{ day: 5, changePct: -50 }], 10, 'step');
+    expect(r.slice(5)).toEqual(new Array(6).fill(-50));
+    expect(r.slice(1, 5)).toEqual(new Array(4).fill(0));
+  });
+
+  it('tek anchor linear modunda lineer interpole eder', () => {
+    // day 0 = 0 (locked); day 10 = -50; linear ramp
+    const r = flattenPathToDailyShocks([{ day: 10, changePct: -50 }], 10, 'linear');
+    expect(r[0]).toBe(0);
+    expect(r[10]).toBe(-50);
+    expect(r[5]).toBeCloseTo(-25, 5);
+  });
+
+  it('V-shape: düşüş + toparlanma', () => {
+    const path = [
+      { day: 0, changePct: 0 },
+      { day: 10, changePct: -50 },
+      { day: 20, changePct: -20 },
+      { day: 30, changePct: -5 }
+    ];
+    const r = flattenPathToDailyShocks(path, 30, 'linear');
+    expect(r[0]).toBe(0);
+    expect(r[10]).toBeCloseTo(-50, 5);
+    expect(r[20]).toBeCloseTo(-20, 5);
+    expect(r[30]).toBeCloseTo(-5, 5);
+    // Day 15 düşüşten toparlanma arası: ortalama ≈ -35
+    expect(r[15]).toBeGreaterThan(-50);
+    expect(r[15]).toBeLessThan(-20);
+  });
+
+  it('duplicate day anchor → sonuncusu kazanır', () => {
+    // Aynı gün iki anchor; linear modda sonraki day aralığındaki oranlama ikinciden etkilenir
+    const r = flattenPathToDailyShocks(
+      [{ day: 5, changePct: -10 }, { day: 5, changePct: -40 }, { day: 10, changePct: -50 }],
+      10, 'linear'
+    );
+    expect(r[5]).toBe(-40);
+  });
+
+  it('day > days anchor clamp edilir (yok sayılır)', () => {
+    const r = flattenPathToDailyShocks(
+      [{ day: 5, changePct: -30 }, { day: 20, changePct: -90 }],
+      10, 'step'
+    );
+    // day 20 > days, anchor yok sayılır; tüm günler step 0 → -30
+    expect(r[10]).toBe(-30);
+  });
+
+  it('anchor day 0 filtrelenir (locked 0)', () => {
+    // day 0 anchor -99 olsa bile day 0 = 0
+    const r = flattenPathToDailyShocks([{ day: 0, changePct: -99 }, { day: 3, changePct: -30 }], 3, 'step');
+    expect(r[0]).toBe(0);
+    expect(r[3]).toBe(-30);
   });
 });

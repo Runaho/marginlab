@@ -6,6 +6,7 @@
   import { selectMarginCallMap } from '$lib/engine/selectors/selectMarginCallMap';
   import { computeCosts, COST_LABELS } from '$lib/engine/costs';
   import { SCENARIOS } from '$lib/engine/presets';
+  import { presetToSpec } from '$lib/engine/types';
   import { groupedTickerOptions, groupedTickerGroups, getInstrument, betaFor, sectorFor } from '$lib/engine/market';
   import { DEFAULT_COLLATERAL_RATE } from '$lib/engine/marginProfile';
   import { openConcept } from '$lib/state/conceptStore';
@@ -114,12 +115,7 @@
       holdingDays,
       profileId,
       settings,
-      scenario: {
-        dailyDrop: activeScenario.dailyDrop,
-        tradeShock: activeScenario.tradeShock,
-        portfolioShock: activeScenario.portfolioShock,
-        holdingPeriod: activeScenario.days
-      }
+      spec: presetToSpec(activeScenario)
     })
   );
 
