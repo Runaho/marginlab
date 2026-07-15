@@ -8,7 +8,7 @@ export const APP_STATE_VERSION = 2;
 
 /**
  * Working draft: kullanıcının üzerinde çalıştığı trade taslağı.
- * Simulator yazar, Scenarios + DecisionStrip + MarginCallMap okur.
+ * Simulator yazar, Scenarios + DecisionStrip + MarginLabMap okur.
  */
 export interface WorkingTrade {
   ticker: string;

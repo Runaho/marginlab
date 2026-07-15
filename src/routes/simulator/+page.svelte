@@ -3,7 +3,7 @@
   import { settings, updateSettings } from '$lib/engine/settings/settingsStore.svelte';
   import { selectTradeImpact } from '$lib/engine/selectors/selectTradeImpact';
   import { selectScenarioProjection } from '$lib/engine/selectors/selectScenarioProjection';
-  import { selectMarginCallMap } from '$lib/engine/selectors/selectMarginCallMap';
+  import { selectMarginLabMap } from '$lib/engine/selectors/selectMarginLabMap';
   import { computeCosts, COST_LABELS } from '$lib/engine/costs';
   import { SCENARIOS } from '$lib/engine/presets';
   import { presetToSpec } from '$lib/engine/types';
@@ -11,7 +11,7 @@
   import { DEFAULT_COLLATERAL_RATE } from '$lib/engine/marginProfile';
   import { openConcept } from '$lib/state/conceptStore';
   import { t } from '$lib/i18n';
-  import { conceptTitle, marginDisclaimer } from '$lib/i18n/labels';
+  import { conceptTitle, marginDisclaimer, profileLabel } from '$lib/i18n/labels';
   import { fmtMoney, fmtPct } from '$lib/utils/format';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import WarningBox from '$lib/components/ui/WarningBox.svelte';
@@ -21,7 +21,7 @@
   import ChartCard from '$lib/components/ui/ChartCard.svelte';
   import AssumptionsChecklist from '$lib/components/ui/AssumptionsChecklist.svelte';
   import Icon from '$lib/components/icons/Icon.svelte';
-  import MarginCallMap from '$lib/components/MarginCallMap.svelte';
+  import MarginLabMap from '$lib/components/MarginLabMap.svelte';
 
   const profileId = $derived(settings.activeProfileId);
   const initialMargin = $derived(settings.accountProfiles[profileId].initialMarginRate);
@@ -55,7 +55,7 @@
   }
 
   // Working draft: input değişimleri app.currentTrade'a yazılır → Scenarios +
-  // DecisionStrip + MarginCallMap aynı taslaktan okur. localStorage senkronu
+  // DecisionStrip + MarginLabMap aynı taslaktan okur. localStorage senkronu
   // syncStorage üzerinden ayrı bir $effect'te (250ms debounce) tetiklenir.
   $effect(() => {
     setCurrentTrade({
@@ -119,8 +119,8 @@
     })
   );
 
-  const marginCallMap = $derived(
-    selectMarginCallMap({ cash: app.portfolio.cash, holdings: app.portfolio.holdings, trade: tradeSpec, additionalCash, profileId, settings })
+  const marginLabMap = $derived(
+    selectMarginLabMap({ cash: app.portfolio.cash, holdings: app.portfolio.holdings, trade: tradeSpec, additionalCash, profileId, settings })
   );
 
   const costs = $derived(
@@ -199,7 +199,7 @@
       {/if}
       {#if selectedInfo.owned}
         <span class="tm-sep">·</span>
-        <span class="tm-own">{t('wlInPortfolio')} · {selectedInfo.owned.shares} adet</span>
+        <span class="tm-own">{t('wlInPortfolio')} · {t('simOwnedAdet', { shares: selectedInfo.owned.shares })}</span>
       {:else if selectedInfo.watched}
         <span class="tm-sep">·</span>
         <span class="tm-watch">{t('navWatchlist')}</span>
@@ -381,12 +381,12 @@
     </div>
 
     <AssumptionsChecklist />
-    <p class="profile-note">{t('simProfileNote', { name: settings.accountProfiles[profileId].name })}. {marginDisclaimer()}</p>
+    <p class="profile-note">{t('simProfileNote', { name: profileLabel(profileId) })}. {marginDisclaimer()}</p>
   </section>
 </div>
 
 <div id="map">
-<MarginCallMap {projection} matrix={marginCallMap} />
+<MarginLabMap {projection} matrix={marginLabMap} />
 </div>
 
 <style>

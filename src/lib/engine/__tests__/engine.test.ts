@@ -6,7 +6,7 @@ import type { Settings } from '../settings/types';
 import { selectTradeImpact } from '../selectors/selectTradeImpact';
 import { selectAccountSnapshot } from '../selectors/selectAccountSnapshot';
 import { selectScenarioProjection } from '../selectors/selectScenarioProjection';
-import { selectMarginCallMap } from '../selectors/selectMarginCallMap';
+import { selectMarginLabMap } from '../selectors/selectMarginLabMap';
 import { flattenPathToDailyShocks } from '../account/scenarioEngine';
 import type { TradeSpec } from '../account/scenarioEngine';
 
@@ -264,7 +264,7 @@ describe('Margin Call Haritası (şok matrisi)', () => {
   const settings = baseSettings();
 
   it('matris hücreleri risk durumu taşır', () => {
-    const matrix = selectMarginCallMap({ cash, holdings, trade: trade('NVDA', 3, 200), additionalCash: 0, profileId: 'general', settings });
+    const matrix = selectMarginLabMap({ cash, holdings, trade: trade('NVDA', 3, 200), additionalCash: 0, profileId: 'general', settings });
     expect(matrix.cells.length).toBeGreaterThan(0);
     expect(matrix.cells[0].length).toBeGreaterThan(0);
     const flat = matrix.cells.flat();

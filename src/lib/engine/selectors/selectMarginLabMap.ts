@@ -4,7 +4,7 @@ import type { BrokerProfileId } from '../marginProfile';
 import { resolveProfile, resolveAccountParams, resolveCollateralRisk } from '../account/settingsResolver';
 import { shockMatrix, type ShockMatrix, type TradeSpec, type CombinedInput } from '../account/scenarioEngine';
 
-export function selectMarginCallMap(input: {
+export function selectMarginLabMap(input: {
   cash: number;
   holdings: Holding[];
   trade: TradeSpec;

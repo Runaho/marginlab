@@ -3,6 +3,7 @@
   import { fmtPct } from '$lib/utils/format';
   import Icon from '../icons/Icon.svelte';
   import { t } from '$lib/i18n';
+  import { scenarioLabel } from '$lib/i18n/labels';
 
   const items = $derived([
     {
@@ -28,7 +29,7 @@
     },
     {
       icon: 'info',
-      text: t('assumScenarios', { active: app.activeScenario })
+      text: t('assumScenarios', { active: scenarioLabel(app.activeScenario) })
     },
     {
       icon: 'shield',

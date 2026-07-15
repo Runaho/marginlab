@@ -11,7 +11,7 @@
   import type { Holding, Sector } from '$lib/engine/types';
   import { fmtMoney, fmtPct, fmtShares, fmtNum } from '$lib/utils/format';
   import { t } from '$lib/i18n';
-  import { conceptTitle, sectorLabel } from '$lib/i18n/labels';
+  import { conceptTitle, sectorLabel, profileLabel } from '$lib/i18n/labels';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import WarningBox from '$lib/components/ui/WarningBox.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
@@ -196,11 +196,11 @@
         <span class="cb-k">{t('simTotalCollateral')}</span>
         <span class="cb-v tabular">{fmtMoney(stats.collateral.totalCollateral)}</span>
       </div>
-      <span class="cb-profile">{profile.name}</span>
+      <span class="cb-profile">{profileLabel(profile.id)}</span>
     </div>
     {#if profile.collateralMode === 'cash-only'}
       <p class="adv-note">
-        {t('portAdvNoSec', { profile: profile.name })}
+        {t('portAdvNoSec', { profile: profileLabel(profile.id) })}
       </p>
     {/if}
     <label class="adv-toggle">
@@ -327,7 +327,7 @@
             <label>{t('lblCollateralPct')}<input type="number" min="0" max="100" step="1" value={Math.round((newH.collateral ?? 0) * 100)} oninput={(e) => newH.collateral = (parseFloat((e.currentTarget as HTMLInputElement).value) || 0) / 100} /></label>
             <label>{t('lblSector')}
               <select bind:value={newH.sector}>
-                {#each SECTORS as s}<option value={s}>{s}</option>{/each}
+                {#each SECTORS as s}<option value={s}>{sectorLabel(s)}</option>{/each}
               </select>
             </label>
           </div>

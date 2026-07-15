@@ -6,6 +6,7 @@
   import { selectAccount } from '$lib/engine/selectors/selectAccount';
   import { fmtMoney, fmtPct } from '$lib/utils/format';
   import { t } from '$lib/i18n';
+  import { profileLabel, profileDesc, scenarioLabel } from '$lib/i18n/labels';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import WarningBox from '$lib/components/ui/WarningBox.svelte';
   import GuidedNote from '$lib/components/ui/GuidedNote.svelte';
@@ -81,13 +82,13 @@
     const p = profile;
     const d = _seedDefaults;
     if (p.initialMarginRate !== d.initialMarginRate) {
-      out.push({ key: 'settingsInitMarginFor', label: t('settingsInitMarginFor', { name: p.name }), from: fmtPct(d.initialMarginRate * 100, 0), to: fmtPct(p.initialMarginRate * 100, 0) });
+      out.push({ key: 'settingsInitMarginFor', label: t('settingsInitMarginFor', { name: profileLabel(p.id) }), from: fmtPct(d.initialMarginRate * 100, 0), to: fmtPct(p.initialMarginRate * 100, 0) });
     }
     if (p.maintenanceMarginRate !== d.maintenanceMarginRate) {
-      out.push({ key: 'settingsMaintMarginFor', label: t('settingsMaintMarginFor', { name: p.name }), from: fmtPct(d.maintenanceMarginRate * 100, 0), to: fmtPct(p.maintenanceMarginRate * 100, 0) });
+      out.push({ key: 'settingsMaintMarginFor', label: t('settingsMaintMarginFor', { name: profileLabel(p.id) }), from: fmtPct(d.maintenanceMarginRate * 100, 0), to: fmtPct(p.maintenanceMarginRate * 100, 0) });
     }
     if (p.earlyWarningBufferRate !== d.earlyWarningBufferRate) {
-      out.push({ key: 'settingsEwFor', label: t('settingsEwFor', { name: p.name }), from: fmtPct(d.earlyWarningBufferRate * 100, 0), to: fmtPct(p.earlyWarningBufferRate * 100, 0) });
+      out.push({ key: 'settingsEwFor', label: t('settingsEwFor', { name: profileLabel(p.id) }), from: fmtPct(d.earlyWarningBufferRate * 100, 0), to: fmtPct(p.earlyWarningBufferRate * 100, 0) });
     }
     if (p.securitiesRateFactor !== d.securitiesRateFactor) {
       out.push({ key: 'settingsSecFactor', label: t('settingsSecFactor'), from: fmtPct(d.securitiesRateFactor * 100, 0), to: fmtPct(p.securitiesRateFactor * 100, 0) });
@@ -143,15 +144,15 @@
   <div class="profiles">
     {#each Object.values(settings.accountProfiles) as p (p.id)}
       <button class="pbtn" class:active={p.id === profileId} onclick={() => setActive(p.id)}>
-        <strong>{p.name}</strong>
-        <span>{p.description}</span>
+        <strong>{profileLabel(p.id)}</strong>
+        <span>{profileDesc(p.id)}</span>
       </button>
     {/each}
   </div>
   <div class="grid2">
-    <RangeSlider label={t('settingsInitMarginFor', { name: profile.name })} min={0.1} max={0.9} step={0.05} value={profile.initialMarginRate} oninput={(v) => setProfileField('initialMarginRate', v)} format={(v) => fmtPct(v * 100, 0)} defaultValue={_seedDefaults.initialMarginRate} />
-    <RangeSlider label={t('settingsMaintMarginFor', { name: profile.name })} min={0.1} max={0.5} step={0.05} value={profile.maintenanceMarginRate} oninput={(v) => setProfileField('maintenanceMarginRate', v)} format={(v) => fmtPct(v * 100, 0)} defaultValue={_seedDefaults.maintenanceMarginRate} />
-    <RangeSlider label={t('settingsEwFor', { name: profile.name })} min={0.01} max={0.2} step={0.01} value={profile.earlyWarningBufferRate} oninput={(v) => setProfileField('earlyWarningBufferRate', v)} format={(v) => fmtPct(v * 100, 0)} defaultValue={_seedDefaults.earlyWarningBufferRate} />
+    <RangeSlider label={t('settingsInitMarginFor', { name: profileLabel(profile.id) })} min={0.1} max={0.9} step={0.05} value={profile.initialMarginRate} oninput={(v) => setProfileField('initialMarginRate', v)} format={(v) => fmtPct(v * 100, 0)} defaultValue={_seedDefaults.initialMarginRate} />
+    <RangeSlider label={t('settingsMaintMarginFor', { name: profileLabel(profile.id) })} min={0.1} max={0.5} step={0.05} value={profile.maintenanceMarginRate} oninput={(v) => setProfileField('maintenanceMarginRate', v)} format={(v) => fmtPct(v * 100, 0)} defaultValue={_seedDefaults.maintenanceMarginRate} />
+    <RangeSlider label={t('settingsEwFor', { name: profileLabel(profile.id) })} min={0.01} max={0.2} step={0.01} value={profile.earlyWarningBufferRate} oninput={(v) => setProfileField('earlyWarningBufferRate', v)} format={(v) => fmtPct(v * 100, 0)} defaultValue={_seedDefaults.earlyWarningBufferRate} />
     <RangeSlider label={t('settingsSecFactor')} min={0.5} max={1} step={0.05} value={profile.securitiesRateFactor} oninput={(v) => setProfileField('securitiesRateFactor', v)} format={(v) => fmtPct(v * 100, 0)} defaultValue={_seedDefaults.securitiesRateFactor} />
     <RangeSlider label={t('settingsCashCollateralRate')} min={0} max={1} step={0.05} value={profile.cashCollateralRate} oninput={(v) => setProfileField('cashCollateralRate', v)} format={(v) => fmtPct(v * 100, 0)} defaultValue={_seedDefaults.cashCollateralRate} />
     <RangeSlider label={t('settingsDefaultEquity')} min={0} max={1} step={0.05} value={profile.defaultEligibleEquityRate} oninput={(v) => setProfileField('defaultEligibleEquityRate', v)} format={(v) => fmtPct(v * 100, 0)} defaultValue={_seedDefaults.defaultEligibleEquityRate} />
@@ -205,13 +206,13 @@
       <span class="rate-chip">{k}: {fmtPct(v * 100, 0)}</span>
     {/each}
   </div>
-  <p class="meta">{t('settingsEligibilityRule')} {settings.collateralRisk.eligibilityRules} · {t('settingsVolHaircut')} {settings.collateralRisk.volatilityHaircutOverride} · {t('settingsLiqHaircut')} {settings.collateralRisk.liquidityHaircutOverride}</p>
+  <p class="meta">{t('settingsEligibilityRule')} {t(settings.collateralRisk.eligibilityRules)} · {t('settingsVolHaircut')} {settings.collateralRisk.volatilityHaircutOverride} · {t('settingsLiqHaircut')} {settings.collateralRisk.liquidityHaircutOverride}</p>
 
   <h4 class="sub">{t('settingsScenarioThresholds')}</h4>
   <div class="grid2">
     <RangeSlider label={t('settingsMcBuffer')} min={0} max={0.1} step={0.005} value={settings.scenarioEngine.riskThresholds.marginCallBufferRate} oninput={(v) => updateSettings((s) => { s.scenarioEngine.riskThresholds.marginCallBufferRate = v; })} format={(v) => fmtPct(v * 100, 1)} defaultValue={0} />
   </div>
-  <p class="meta">{t('settingsActiveScenarioSet')} {settings.scenarioEngine.scenarioSet.join(', ')}</p>
+  <p class="meta">{t('settingsActiveScenarioSet')} {settings.scenarioEngine.scenarioSet.map((s) => scenarioLabel(s)).join(', ')}</p>
 </details>
 
 <!-- Tier 3: Sistem varsayılanları (kapalı, admin) -->
@@ -230,7 +231,7 @@
   <div class="grid2">
     <label>{t('settingsMarketSource')}<input value={settings.dataSource.marketDataSource} readonly /></label>
     <label>{t('settingsPortfolioSource')}<input value={settings.dataSource.portfolioSourceMetadata} readonly /></label>
-    <label>{t('settingsFallback')}<input value={settings.dataSource.fallbackBehavior} readonly /></label>
+    <label>{t('settingsFallback')}<input value={t(settings.dataSource.fallbackBehavior)} readonly /></label>
     <label>{t('settingsStalePolicy')}<input value={settings.dataSource.stalePolicy} readonly /></label>
   </div>
   <p class="meta">{t('settingsLastUpdated')} {settings.dataSource.lastUpdated}</p>

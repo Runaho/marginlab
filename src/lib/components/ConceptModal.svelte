@@ -9,6 +9,7 @@
   import Modal from './ui/Modal.svelte';
   import Icon from './icons/Icon.svelte';
   import { t } from '$lib/i18n';
+  import { profileLabel } from '$lib/i18n/labels';
 
   const stats = $derived(
     selectAccount({
@@ -25,7 +26,7 @@
       cash: fmtMoney(stats.collateral.cashCollateral),
       securities: fmtMoney(stats.collateral.securitiesCollateral),
       total: fmtMoney(stats.collateral.totalCollateral),
-      profile: profile.name,
+      profile: profileLabel(profile.id),
       rate: fmtPct(profile.securitiesRateFactor * 100, 0)
     })
   );

@@ -13,7 +13,7 @@ export type Theme = 'light' | 'dark';
  * Geçici "in-flight" mesaj şemasının yerini "working draft" aldı:
  * kullanıcı bir ticker/shares/additionalCash/holdingDays kombinasyonu
  * planladığında burada yaşar; Simulator yazar, Scenarios + DecisionStrip +
- * MarginCallMap okur. #d= base64 payload'ında da taşınır (Share için).
+ * MarginLabMap okur. #d= base64 payload'ında da taşınır (Share için).
  */
 export type { WorkingTrade };
 export type { UserScenario };

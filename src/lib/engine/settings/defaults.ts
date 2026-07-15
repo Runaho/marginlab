@@ -25,8 +25,7 @@ function profileToAccount(p: BrokerProfile): AccountProfile {
     initialMarginRate: DEFAULT_ACCOUNT.initialMargin,
     maintenanceMarginRate: DEFAULT_ACCOUNT.maintenanceMargin,
     earlyWarningBufferRate: 0.1,
-    liquidationThresholdPolicy:
-      'Sürdürme sınırının altına inilince broker, pozisyonları kısmi veya tam tasfiye etme hakkına sahiptir.',
+    liquidationThresholdPolicy: 'settingsLiquidationPolicy',
     minimumEquityThreshold: undefined,
     currency: 'USD'
   };
@@ -62,7 +61,7 @@ export function seedSettings(): SettingsV1 {
       currencyConversionCost: 0
     },
     collateralRisk: {
-      eligibilityRules: 'Piyasa verisiyle eşleşen ve hariç tutulmayan pozisyonlar uygundur.',
+      eligibilityRules: 'settingsEligibilityRules',
       instrumentTypeRates: {},
       concentrationThreshold: CONCENTRATION.thresholds[0]?.minWeight ?? 0.4,
       concentrationCurve: CONCENTRATION.thresholds,
@@ -94,7 +93,7 @@ export function seedSettings(): SettingsV1 {
       marketDataSource: 'marketData.json',
       portfolioSourceMetadata: 'defaultPortfolio.json',
       lastUpdated: new Date().toISOString(),
-      fallbackBehavior: 'Piyasa verisi yoksa kullanıcı fiyatı elle girer; oranlar varsayımsal kabul edilir.',
+      fallbackBehavior: 'settingsFallbackBehavior',
       stalePolicy: 'warn'
     }
   };

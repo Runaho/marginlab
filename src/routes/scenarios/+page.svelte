@@ -7,7 +7,7 @@
   } from '$lib/state/appState.svelte';
   import { settings } from '$lib/engine/settings/settingsStore.svelte';
   import { selectScenarioProjection } from '$lib/engine/selectors/selectScenarioProjection';
-  import { selectMarginCallMap } from '$lib/engine/selectors/selectMarginCallMap';
+  import { selectMarginLabMap } from '$lib/engine/selectors/selectMarginLabMap';
   import { computeCosts, COST_LABELS } from '$lib/engine/costs';
   import { SCENARIOS } from '$lib/engine/presets';
   import { presetToSpec, userScenarioToSpec, type ScenarioInput, type UserScenario, type ScenarioSpec } from '$lib/engine/types';
@@ -15,14 +15,14 @@
   import { DEFAULT_COLLATERAL_RATE } from '$lib/engine/marginProfile';
   import { openConcept } from '$lib/state/conceptStore';
   import { t } from '$lib/i18n';
-  import { marginDisclaimer } from '$lib/i18n/labels';
+  import { marginDisclaimer, scenarioDesc, scenarioLabel, profileLabel } from '$lib/i18n/labels';
   import { fmtMoney, fmtPct } from '$lib/utils/format';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
   import WarningBox from '$lib/components/ui/WarningBox.svelte';
   import GuidedNote from '$lib/components/ui/GuidedNote.svelte';
   import AssumptionsChecklist from '$lib/components/ui/AssumptionsChecklist.svelte';
-  import MarginCallMap from '$lib/components/MarginCallMap.svelte';
+  import MarginLabMap from '$lib/components/MarginLabMap.svelte';
   import LineChart from '$lib/components/charts/LineChart.svelte';
   import CustomScenarioBuilder from '$lib/components/scenarios/CustomScenarioBuilder.svelte';
   import Icon from '$lib/components/icons/Icon.svelte';
@@ -74,7 +74,7 @@
       kind: 'preset',
       key: 'preset:' + s.name,
       displayName: s.name,
-      description: s.description,
+      description: scenarioDesc(s.name),
       spec: presetToSpec(s),
       basedOn: null,
       customRef: null
@@ -84,8 +84,8 @@
   function customToView(u: UserScenario): ScenarioViewItem {
     const desc =
       u.kind === 'simple'
-        ? `Trade ${fmtPct(u.tradeShock * 100, 0)} · Portfolio ${fmtPct(u.portfolioShock * 100, 0)} · ${u.days}d`
-        : `Path · ${u.tradePath.length} anchors · ${u.holdingPeriod}d`;
+        ? t('scenCustomSimpleDesc', { trade: fmtPct(u.tradeShock * 100, 0), portfolio: fmtPct(u.portfolioShock * 100, 0), days: u.days })
+        : t('scenCustomPathDesc', { anchors: u.tradePath.length, days: u.holdingPeriod });
     return {
       kind: 'custom',
       key: 'custom:' + u.id,
@@ -140,7 +140,7 @@
   });
 
   const matrix = $derived(
-    selectMarginCallMap({ cash: app.portfolio.cash, holdings: app.portfolio.holdings, trade: tradeSpec, additionalCash, profileId, settings })
+    selectMarginLabMap({ cash: app.portfolio.cash, holdings: app.portfolio.holdings, trade: tradeSpec, additionalCash, profileId, settings })
   );
 
   // Compute costs — aktif senaryonun holdingPeriod'unu kullan (custom path veya preset days).
@@ -221,6 +221,10 @@
     return v.description;
   }
 
+  function displayLabel(v: ScenarioViewItem): string {
+    return v.kind === 'preset' ? scenarioLabel(v.displayName) : v.displayName;
+  }
+
   function selectItem(v: ScenarioViewItem) {
     if (v.kind === 'preset') {
       setActiveScenario(v.displayName);
@@ -240,7 +244,7 @@
     const newCustom: UserScenario = {
       id,
       kind: 'path',
-      name: `${s.name} (custom)`,
+      name: `${s.name}${t('simCustomSuffix')}`,
       basedOnScenarioId: s.name,
       tradePath,
       portfolioPath,
@@ -319,7 +323,7 @@
             {#if x.item.kind === 'custom'}
               <Icon name="shield-check" size={12} /> {x.item.displayName}
             {:else}
-              {x.item.displayName}
+              {scenarioLabel(x.item.displayName)}
             {/if}
           </span>
           <Badge level={verdictLevel(x.verdict)} label={verdictLabel(x.verdict)} />
@@ -359,7 +363,7 @@
 
 <section class="card stress">
   <div class="card-head">
-    <h3>{t('scenStressTitle', { name: active.item.displayName })}</h3>
+    <h3>{t('scenStressTitle', { name: displayLabel(active.item) })}</h3>
     <Badge
       level={verdictLevel(active.verdict)}
       label={verdictLabel(active.verdict)}
@@ -408,7 +412,7 @@
 
 <section class="card detail">
   <div class="card-head">
-    <h3>{t('scenDetailTitle', { name: active.item.displayName })}</h3>
+    <h3>{t('scenDetailTitle', { name: displayLabel(active.item) })}</h3>
     <Badge level={verdictLevel(active.verdict)} label={verdictLabel(active.verdict)} />
   </div>
   <p class="desc">{active.item.description}</p>
@@ -437,10 +441,10 @@
 
   <WarningBox level={verdictLevel(active.verdict)} title={verdictLabel(active.verdict)} detail={active.item.displayName === 'Flat' ? t('scenFlatNote') : active.verdict === 'fragile' ? t('scenFragileNote') : active.verdict === 'watch' ? t('scenWatchNote') : t('scenSafeNote')} />
   <AssumptionsChecklist />
-  <p class="profile-note">{t('simProfileNote', { name: settings.accountProfiles[profileId].name })}. {marginDisclaimer()}</p>
+  <p class="profile-note">{t('simProfileNote', { name: profileLabel(profileId) })}. {marginDisclaimer()}</p>
 </section>
 
-<MarginCallMap projection={active.projection} matrix={matrix} />
+<MarginLabMap projection={active.projection} matrix={matrix} />
 
 <style>
   .card {

@@ -12,7 +12,7 @@
   import type { FinderCandidate, FinderConfig, FinderMode, ScenarioScope, Holding } from '$lib/engine/types';
   import { fmtMoney, fmtPct, fmtShares } from '$lib/utils/format';
   import { t } from '$lib/i18n';
-  import { sectorLabel } from '$lib/i18n/labels';
+  import { sectorLabel, scenarioLabel } from '$lib/i18n/labels';
   import PageHeader from '$lib/components/ui/PageHeader.svelte';
   import Badge from '$lib/components/ui/Badge.svelte';
   import Button from '$lib/components/ui/Button.svelte';
@@ -276,7 +276,7 @@
               />
             </div>
             <div class="badges">
-              <Badge level="neutral" label={t('findBestIn', { scenario: c.bestInScenario })} />
+              <Badge level="neutral" label={t('findBestIn', { scenario: scenarioLabel(c.bestInScenario) })} />
               <Badge level="neutral" label={c.mcDay < 0 ? t('simRunwayLong') : t('findWorstShort', { value: t('simMcDay', { day: c.mcDay }) })} />
             </div>
             <div class="kpis">
@@ -355,9 +355,9 @@
     <label class="inspect-sort">
       {t('findInspectSort')}:
       <select bind:value={inspectSort}>
-        <option value="ticker">{t('findInspectSort')}: ticker</option>
-        <option value="value">{t('findInspectSort')}: value</option>
-        <option value="resilience">{t('findInspectSort')}: resilience</option>
+        <option value="ticker">{t('findInspectSortTicker')}</option>
+        <option value="value">{t('findInspectSortValue')}</option>
+        <option value="resilience">{t('findInspectSortResilience')}</option>
       </select>
     </label>
     <label class="inspect-filter">
@@ -375,8 +375,8 @@
       <table class="inspect-table">
         <thead>
           <tr>
-            <th>Ticker</th>
-            <th>Price</th>
+            <th>{t('thTicker')}</th>
+            <th>{t('thPrice')}</th>
             <th>{t('findInspectStatus')}</th>
             <th>{t('findInspectBestScore')}</th>
             <th>{t('findInspectResilience')}</th>

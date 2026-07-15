@@ -85,13 +85,13 @@
   });
 
   function cellDisplay(p: number): string {
-    if (!isFinite(p)) return t('mcmLegendUnknown');
-    if (p > 100) return t('mcmCellOver100');
+    if (!isFinite(p)) return t('mlmLegendUnknown');
+    if (p > 100) return t('mlmCellOver100');
     return fmtPct(p, 0);
   }
   function bufferLabel(p: number): string {
-    if (!isFinite(p)) return t('mcmLegendUnknown');
-    if (p > 100) return t('mcmCellNoThreshold');
+    if (!isFinite(p)) return t('mlmLegendUnknown');
+    if (p > 100) return t('mlmCellNoThreshold');
     return fmtPct(p, 1);
   }
   function statusLabel(s: RiskStatus | 'unknown'): string {
@@ -124,20 +124,20 @@
   });
 </script>
 
-<ChartCard title={t('mcmTitle')} subtitle={t('mcmSubtitle2')}>
+<ChartCard title={t('mlmTitle')} subtitle={t('mlmSubtitle2')}>
   {#snippet chart()}
     <div class="mcm">
       <div class="mcm-tabs">
-        <button class:active={view === 'timeline'} onclick={() => (view = 'timeline')}>{t('mcmTimeline')}</button>
-        <button class:active={view === 'matrix'} onclick={() => (view = 'matrix')}>{t('mcmMatrix')}</button>
+        <button class:active={view === 'timeline'} onclick={() => (view = 'timeline')}>{t('mlmTimeline')}</button>
+        <button class:active={view === 'matrix'} onclick={() => (view = 'matrix')}>{t('mlmMatrix')}</button>
       </div>
 
-      <div class="mcm-legend" aria-label={t('mcmLegendTitle')}>
-        <span class="lg lg-ok"><i></i> {t('mcmLegendControlled')}</span>
-        <span class="lg lg-ew"><i></i> {t('mcmLegendEarlyWarning')}</span>
-        <span class="lg lg-mr"><i></i> {t('mcmLegendMaintenance')}</span>
-        <span class="lg lg-mc"><i></i> {t('mcmLegendMarginCall')}</span>
-        <span class="lg lg-unknown"><i></i> {t('mcmLegendUnknown')}</span>
+      <div class="mcm-legend" aria-label={t('mlmLegendTitle')}>
+        <span class="lg lg-ok"><i></i> {t('mlmLegendControlled')}</span>
+        <span class="lg lg-ew"><i></i> {t('mlmLegendEarlyWarning')}</span>
+        <span class="lg lg-mr"><i></i> {t('mlmLegendMaintenance')}</span>
+        <span class="lg lg-mc"><i></i> {t('mlmLegendMarginlab')}</span>
+        <span class="lg lg-unknown"><i></i> {t('mlmLegendUnknown')}</span>
       </div>
 
       {#if view === 'timeline'}
@@ -159,24 +159,24 @@
               yMin={-50}
               yMax={100}
               xLabel={t('unitDay')}
-              ariaLabel={t('mcmTimelineAria')}
+              ariaLabel={t('mlmTimelineAria')}
             />
           {/if}
           <p class="micro">
-            {t('mcmMicro', { ewPct: ewPct.toFixed(0) })}
+            {t('mlmMicro', { ewPct: ewPct.toFixed(0) })}
           </p>
         </div>
       {:else}
-        <div class="mcm-matrix" role="region" aria-label={t('mcmMatrix')}>
+        <div class="mcm-matrix" role="region" aria-label={t('mlmMatrix')}>
           <div class="mm-axis">
-            <span class="mm-axis-y">{t('mcmAxisPortfolio')}</span>
-            <span class="mm-axis-x">{t('mcmAxisTrade')} →</span>
-            <span class="mm-axis-cell">{t('mcmAxisCell')}</span>
+            <span class="mm-axis-y">{t('mlmAxisPortfolio')}</span>
+            <span class="mm-axis-x">{t('mlmAxisTrade')} →</span>
+            <span class="mm-axis-cell">{t('mlmAxisCell')}</span>
           </div>
-          <table class="mm-grid" role="grid" aria-label={t('mcmMatrix')}>
+          <table class="mm-grid" role="grid" aria-label={t('mlmMatrix')}>
               <thead>
                 <tr>
-                  <th class="mm-corner" scope="col">{t('mcmCorner')}</th>
+                  <th class="mm-corner" scope="col">{t('mlmCorner')}</th>
                   {#each matrix.tradeShocks as ts (ts)}
                     <th scope="col">{fmtPct(ts * 100, 0)}</th>
                   {/each}
@@ -193,7 +193,7 @@
                           class="mm-cell {statusClass(cell.riskStatus)}"
                           class:sel={selected?.ts === ts && selected?.ps === ps}
                           onclick={() => (selected = { ts, ps })}
-                          aria-label={t('mcmCellAria', { trade: fmtPct(ts * 100, 0), portfolio: fmtPct(ps * 100, 0), status: statusLabel(cell.riskStatus as RiskStatus) })}
+                          aria-label={t('mlmCellAria', { trade: fmtPct(ts * 100, 0), portfolio: fmtPct(ps * 100, 0), status: statusLabel(cell.riskStatus as RiskStatus) })}
                         >
                           <span class="mm-cell-val">{cellDisplay(cell.bufferPct)}</span>
                         </button>
@@ -205,7 +205,7 @@
             </table>
 
             <p class="micro axis-help">
-              {t('mcmAutoSelectHint', { trade: '-15%', portfolio: '-10%' })}
+              {t('mlmAutoSelectHint', { trade: '-15%', portfolio: '-10%' })}
             </p>
 
             {#if selectedCell}
@@ -215,30 +215,30 @@
                   level={selectedCell.riskStatus === 'margin-call' || selectedCell.riskStatus === 'maintenance-risk' ? 'danger' : selectedCell.riskStatus === 'early-warning' ? 'warning' : selectedCell.riskStatus === 'controlled' ? 'success' : 'neutral'}
                   label={statusLabel(selectedCell.riskStatus as RiskStatus)}
                 />
-                <span class="mm-d-sub">{t('mcmCellSub', { trade: fmtPct(selectedCell.tradeShock * 100, 0), portfolio: fmtPct(selectedCell.portfolioShock * 100, 0) })}</span>
+                <span class="mm-d-sub">{t('mlmCellSub', { trade: fmtPct(selectedCell.tradeShock * 100, 0), portfolio: fmtPct(selectedCell.portfolioShock * 100, 0) })}</span>
               </div>
-              <p class="mm-d-status">{t('mcmSelectedShock', { ticker: ticker || '—', trade: fmtPct(selectedCell.tradeShock * 100, 0), portfolio: fmtPct(selectedCell.portfolioShock * 100, 0) })}</p>
+              <p class="mm-d-status">{t('mlmSelectedShock', { ticker: ticker || '—', trade: fmtPct(selectedCell.tradeShock * 100, 0), portfolio: fmtPct(selectedCell.portfolioShock * 100, 0) })}</p>
               <ul>
-                <li><span>Buffer</span><strong class="tabular">{bufferLabel(selectedCell.bufferPct)}</strong></li>
-                <li><span>{t('mcmTradeValue')}</span><strong class="tabular">{fmtMoney(selectedCell.tradeValue)}</strong></li>
-                <li><span>{t('mcmPortfolioValue')}</span><strong class="tabular">{fmtMoney(selectedCell.portfolioValue)}</strong></li>
+                <li><span>{t('mlmBuffer')}</span><strong class="tabular">{bufferLabel(selectedCell.bufferPct)}</strong></li>
+                <li><span>{t('mlmTradeValue')}</span><strong class="tabular">{fmtMoney(selectedCell.tradeValue)}</strong></li>
+                <li><span>{t('mlmPortfolioValue')}</span><strong class="tabular">{fmtMoney(selectedCell.portfolioValue)}</strong></li>
               </ul>
               {#if selectedCell.calculationStatus !== 'insufficient-data'}
                 <div class="mm-d-rec">
-                  <div class="mm-d-rec-title">{t('mcmRecAction')}</div>
+                  <div class="mm-d-rec-title">{t('mlmRecAction')}</div>
                   {#if suggestedLotReducePct !== null}
-                    <div class="mm-d-rec-row">→ {t('mcmRecLotReduce', { n: 1, pct: fmtPct(suggestedLotReducePct, 0) })}</div>
+                    <div class="mm-d-rec-row">→ {t('mlmRecLotReduce', { n: 1, pct: fmtPct(suggestedLotReducePct, 0) })}</div>
                   {/if}
                   {#if suggestedCashAdd !== null}
-                    <div class="mm-d-rec-row">→ {t('mcmRecCashAdd', { value: fmtMoney(suggestedCashAdd) })}</div>
+                    <div class="mm-d-rec-row">→ {t('mlmRecCashAdd', { value: fmtMoney(suggestedCashAdd) })}</div>
                   {/if}
                 </div>
               {:else}
-                <p class="micro">{t('mcmCellTooltip')}</p>
+                <p class="micro">{t('mlmCellTooltip')}</p>
               {/if}
             </div>
           {:else}
-            <p class="micro">{t('mcmSelectCell')}</p>
+            <p class="micro">{t('mlmSelectCell')}</p>
           {/if}
         </div>
       {/if}

@@ -1,17 +1,18 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { NAV } from './nav';
+  import { buildNav } from './nav';
   import Icon from '../icons/Icon.svelte';
   import { t } from '$lib/i18n';
 
   let { onnav }: { onnav?: () => void } = $props();
 
   const active = $derived($page.url.pathname);
+  const navItems = $derived(buildNav(t));
 </script>
 
 <nav class="nav">
   <div class="group-title">{t('navWorkspace')}</div>
-  {#each NAV as item (item.href)}
+  {#each navItems as item (item.href)}
     {@const isActive = item.href === '/' ? active === '/' : active.startsWith(item.href)}
     <a
       href={item.href}

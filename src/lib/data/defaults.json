@@ -9,33 +9,33 @@
   "brokerProfiles": {
     "general": {
       "id": "general",
-      "label": "Genel Simülasyon",
-      "shortLabel": "Genel",
-      "description": "Eğitim amaçlı genel model. Uygun menkul kıymetler varsayımsal %75 oranıyla hesap seviyesinde teminata sayılır.",
+      "label": "General Simulation",
+      "shortLabel": "General",
+      "description": "A general educational model. Eligible securities count toward account-level collateral at an assumed 75%.",
       "securitiesAsCollateral": true,
       "securitiesRateFactor": 1,
       "concentrationThreshold": 0.4
     },
     "cash-first": {
       "id": "cash-first",
-      "label": "Nakit-öncelikli",
-      "shortLabel": "Nakit",
-      "description": "Muhafazakâr model. Menkul kıymetler teminat üretmez; yalnızca nakit kullanılabilir teminat sayılır.",
+      "label": "Cash-first",
+      "shortLabel": "Cash",
+      "description": "A conservative model. Securities produce no collateral; only cash counts as available collateral.",
       "securitiesAsCollateral": false,
       "securitiesRateFactor": 0,
       "concentrationThreshold": 0.4
     },
     "conservative": {
       "id": "conservative",
-      "label": "Temkinli (indirimli oran)",
-      "shortLabel": "Temkinli",
-      "description": "Menkul kıymetler teminata sayılır ama daha düşük efektif oranla (nominal oranın ~2/3’ü). Haircut duyarlılığını göstermek içindir.",
+      "label": "Conservative (discounted rate)",
+      "shortLabel": "Conservative",
+      "description": "Securities count toward collateral but at a lower effective rate (~2/3 of nominal). Shows haircut sensitivity.",
       "securitiesAsCollateral": true,
       "securitiesRateFactor": 0.6667,
       "concentrationThreshold": 0.4
     }
   },
-  "marginDisclaimer": "Seçili hesap profili ve collateral varsayımları ile hesaplandı. Gerçek broker oranları, uygunluk ve tasfiye koşulları farklı olabilir.",
+  "marginDisclaimer": "Calculated with the selected account profile and collateral assumptions. Actual broker rates, eligibility and liquidation conditions may differ.",
   "sectors": [
     "Teknoloji",
     "Finans",
@@ -87,7 +87,7 @@
   "scenarios": [
     {
       "name": "Bull",
-      "description": "Güçlü yükseliş ortamı. Piyasa ve trade birlikte değer kazanır.",
+      "description": "Strong uptrend. Market and trade appreciate together.",
       "tradeShock": 0.3,
       "portfolioShock": 0.15,
       "dailyDrop": 0.0,
@@ -95,7 +95,7 @@
     },
     {
       "name": "Hype",
-      "description": "Aşırı iyimserlik. Trade size abartılı prim yapar, portföy sadece hafif yükselir.",
+      "description": "Excessive optimism. Trade gets an outsized premium; portfolio rises only mildly.",
       "tradeShock": 0.45,
       "portfolioShock": 0.05,
       "dailyDrop": 0.0,
@@ -103,7 +103,7 @@
     },
     {
       "name": "Low Dip",
-      "description": "Hafif düzeltme. Her şey yüzde 8 geriler.",
+      "description": "Mild correction. Everything recedes 8%.",
       "tradeShock": -0.08,
       "portfolioShock": -0.08,
       "dailyDrop": -0.01,
@@ -111,7 +111,7 @@
     },
     {
       "name": "Peak",
-      "description": "Zirve tükenmesi ~ S&P düzeltmesi Haziran 2022. Trade sert, portföy orta şok.",
+      "description": "Peak exhaustion ~ S&P correction June 2022. Trade takes a hard hit, portfolio a moderate one.",
       "tradeShock": -0.28,
       "portfolioShock": -0.15,
       "dailyDrop": -0.03,
@@ -119,7 +119,7 @@
     },
     {
       "name": "Slow Bleed",
-      "description": "Yavaş kanama. Uzun vadeli kademeli erime, günde %1 düşüş.",
+      "description": "Slow bleed. Long-term gradual erosion, 1% drop per day.",
       "tradeShock": -0.18,
       "portfolioShock": -0.18,
       "dailyDrop": -0.01,
@@ -127,7 +127,7 @@
     },
     {
       "name": "Credit Stress",
-      "description": "Sessiz katil. Mevcut portföy değer kaybeder, trade yerinde sayar.",
+      "description": "Silent killer. Existing portfolio loses value; trade stays flat.",
       "tradeShock": 0.0,
       "portfolioShock": -0.2,
       "dailyDrop": 0.0,
@@ -135,7 +135,7 @@
     },
     {
       "name": "Tech Selloff",
-      "description": "Teknoloji satışı ~ NASDAQ düzeltmesi Q4 2022. Teknoloji ağırlıklı portföyü vurur.",
+      "description": "Tech selloff ~ NASDAQ correction Q4 2022. Hits technology-heavy portfolios.",
       "tradeShock": -0.22,
       "portfolioShock": -0.25,
       "dailyDrop": -0.02,
@@ -143,7 +143,7 @@
     },
     {
       "name": "Recovery",
-      "description": "Toparlanma. Şok sonrası piyasa yeniden yükselişe geçer.",
+      "description": "Recovery. After the shock the market turns back up.",
       "tradeShock": 0.18,
       "portfolioShock": 0.12,
       "dailyDrop": 0.0,
@@ -151,7 +151,7 @@
     },
     {
       "name": "Flat",
-      "description": "Fiyat yerinde sayar. Sadece taşıma maliyeti (faiz) sessizce işler — kâr eşiği budur.",
+      "description": "Price stays flat. Only carrying cost (interest) quietly accrues — this is the profit threshold.",
       "tradeShock": 0.0,
       "portfolioShock": 0.0,
       "dailyDrop": 0.0,

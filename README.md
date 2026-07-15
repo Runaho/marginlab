@@ -349,8 +349,8 @@ const equity = Math.min(config.budget, tradeValue * ctx.account.initialMargin);
 ### Local Development
 ```bash
 # Clone and setup
-git clone https://github.com/your-org/margincall
-cd margincall
+git clone https://github.com/runaho/marginlab
+cd marginlab
 # npm install  (or equivalent)
 
 # Development server
