@@ -1,13 +1,19 @@
 # Dependencies
 node_modules/
-npm-debug.log
-yarn-error.log
-package-lock.json
-yarn.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Build outputs
 build/
 dist/
+.svelte-kit/
+.vercel/
+
+# Logs & temporary files
+*.log
+check.log
+*.tsbuildinfo
 
 # IDE & Editor
 .vscode/
@@ -15,16 +21,15 @@ dist/
 *.swp
 *.swo
 *~
+
+# OS
 .DS_Store
+Thumbs.db
 
 # Environment variables
 .env
 .env.local
 .env.*.local
 
-# SvelteKit
-.svelte-kit/
-.vercel/
-
-# OS
-Thumbs.db
+# Inlang cache (auto-generated)
+project.inlang/cache/
