@@ -1,5 +1,7 @@
 # MarginLab Educational Platform - Project Specification
 
+<img width="2025" height="1273" alt="marginlab" src="https://github.com/user-attachments/assets/601b8d2a-265b-49fc-b25c-83a124efb42f" />
+
 ## Overview
 
 MarginLab is an educational stock market platform that teaches users how to manage a portfolio using margin responsibly. The platform combines portfolio management, margin requirement calculators, and trade suggestions based on available margin and portfolio constraints.
