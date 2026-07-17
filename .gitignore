@@ -4,6 +4,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Lockfile excluded — Cloudflare Pages has its own resolver.
+# Local dev: `npm install` (macOS arm64 / linux x64) — npm picks binaries
+# from package.json's platform-specific optionalDependencies on each install.
+# Avoids EBADPLATFORM errors from stale macOS-built lockfiles on linux CI.
+package-lock.json
+
 # Build outputs
 build/
 dist/
