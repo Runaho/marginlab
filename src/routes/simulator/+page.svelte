@@ -37,6 +37,19 @@
   let additionalCash = $state(app.currentTrade?.additionalCash ?? 0);
   let holdingDays = $state(app.currentTrade?.holdingDays ?? 30);
 
+  // Mobile responsive label: native <select> truncates options poorly,
+  // and long labels like 'NVDA — NVIDIA Corp. (own: 3, weight 25%)' overflow
+  // the 313px select box on phones. Show ticker only on small screens.
+  let isMobile = $state(false);
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 540px)');
+    isMobile = mq.matches;
+    const handler = (e: MediaQueryListEvent) => (isMobile = e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  });
+
   const tickerOptions = $derived(groupedTickerOptions(app.portfolio.holdings, app.watchlist));
   const tickerGroups = $derived(groupedTickerGroups(app.portfolio.holdings, app.watchlist));
 
@@ -182,7 +195,9 @@
           <optgroup label={g.label}>
             {#each g.options as opt (opt.ticker)}
               <option value={opt.ticker}>
-                {opt.ticker} — {opt.name}{opt.group === 'portfolio' && opt.shares ? t('simOwnedNote', { shares: opt.shares, weight: ((opt.weight ?? 0) * 100).toFixed(0) }) : ''}{opt.group === 'watchlist' ? ` · ${t('navWatchlist')}` : ''}
+                {isMobile
+                  ? opt.ticker
+                  : `${opt.ticker} — ${opt.name}${opt.group === 'portfolio' && opt.shares ? t('simOwnedNote', { shares: opt.shares, weight: ((opt.weight ?? 0) * 100).toFixed(0) }) : ''}${opt.group === 'watchlist' ? ` · ${t('navWatchlist')}` : ''}`}
               </option>
             {/each}
           </optgroup>
@@ -395,6 +410,7 @@
     grid-template-columns: 1fr 1fr;
     gap: var(--space-6);
     margin-bottom: var(--space-6);
+    min-width: 0;
   }
   .card {
     background: var(--surface);
