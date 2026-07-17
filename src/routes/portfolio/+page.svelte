@@ -147,6 +147,13 @@
     newH.sector = sectorFor(m.category);
   }
 
+  /** Sector explorer (empty state) ile quick-add formu arasinda kopru */
+  let pickSector = $state<string>('');
+  function prefillFromMarket(ticker: string) {
+    pickMarketTicker(ticker);
+    // Formu gorunur kalmaya zorla (details.add.quick zaten open)
+  }
+
   // Onboarding modal for first-time visitors
   let showOnboarding = $state(false);
 
@@ -215,7 +222,7 @@
 </div>
 {#if fileError}<div class="err">{fileError}</div>{/if}
 
-<div class="grid" class:single-column={app.portfolio.holdings.length === 0}>
+<div class="grid">
   {#if app.portfolio.holdings.length === 0}
     <section class="card empty-rich">
       <!-- Empty workspace — bigger, asymmetric-healing, mimics table-card density -->
@@ -292,15 +299,9 @@
       </details>
     </section>
   {/if}
+  {#if app.portfolio.holdings.length > 0}
   <section class="card table-card">
-    {#if app.portfolio.holdings.length === 0}
-      <!-- Empty mode: collapsed card, only advanced note for awareness -->
-      <div class="card-head"><h3>{t('navSettings')}</h3></div>
-      <p class="adv-note">{t('portAdvNote')}</p>
-    {:else}
     <div class="card-head">
-      <h3>{t('portPositions', { count: app.portfolio.holdings.length })}</h3>
-    </div>
     <div class="coll-breakdown">
       <div class="cb-item">
         <span class="cb-k">{t('simCashCollateral')}</span>
@@ -459,19 +460,56 @@
         </div>
       </div>
     </details>
-    {/if}
   </section>
+  {/if}
 
-  <aside class="card guide">
+  <aside class="card stats-panel">
     {#if app.portfolio.holdings.length === 0}
-      <!-- Empty mode: compact guide column -->
-      <div class="card-head"><h3>{t('portConceptGuide')}</h3></div>
-      <ul class="concepts">
-        {#each concepts as c (c.key)}
-          <li><button onclick={() => openConcept(c.key)}><Icon name="info" size={16} /> {conceptTitle(c.key)}</button></li>
+      <!-- Empty mode: sector explorer -->
+      <div class="card-head"><h3>{t('portSectorExplorerTitle')}</h3></div>
+      <p class="acct-hint">{t('portSectorExplorerSub')}</p>
+      <label class="acct" style="margin-top:var(--space-3)">{t('portPickSector')}
+        <select bind:value={pickSector}>
+          <option value="">{t('commonSelect')}</option>
+          {#each SECTORS as s}
+            <option value={s}>{sectorLabel(s)}</option>
+          {/each}
+        </select>
+      </label>
+      {#if pickSector}
+        {@const sectorStocks = MARKET.filter((m) => sectorFor(m.category) === pickSector).slice(0, 5)}
+        <p class="an-note" style="margin-top:var(--space-4)">{t('portPopularIn')} {sectorLabel(pickSector)}</p>
+        <ul class="sector-pills">
+          {#each sectorStocks as m (m.ticker)}
+            <li>
+              <button type="button" class="sector-pill" onclick={() => prefillFromMarket(m.ticker)}>
+                <strong>{m.ticker}</strong>
+                <span class="sector-pill-company">{m.company}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+        <p class="acct-hint" style="margin-top:var(--space-3)">{t('portTipAdd')}</p>
+      {/if}
+    {:else}
+      <!-- Live mode: portfolio stats -->
+      <div class="card-head"><h3>{t('portAnalytics')}</h3></div>
+      <div class="analytics">
+        <div class="an-row"><span>{t('kpiBuyingPower')}</span><span class="tabular">{fmtMoney(analytics.buyingPower)}</span></div>
+        <div class="an-row"><span>{t('portMaintCoverage')}</span><span class="tabular">{fmtNum(analytics.maintenanceCoverage)}×</span></div>
+        <div class="an-row"><span>{t('portMarginUsage')}</span><span class="tabular" class:neg={analytics.marginUtilization > 0.8}>{fmtPct(analytics.marginUtilization * 100, 0)}</span></div>
+        <div class="an-row"><span>{t('metricConcentration')}</span><span class="tabular">{analytics.concentrationRisk.flag ? '⚠ ' : ''}{fmtPct(analytics.concentrationRisk.current * 100, 0)} · {analytics.concentrationRisk.maxPosition}</span></div>
+      </div>
+      <p class="an-note">{t('portSectorExposure')}</p>
+      <ul class="an-sectors">
+        {#each Object.entries(analytics.sectorExposure) as [sector, w] (sector)}
+          <li><span>{sectorLabel(sector)}</span><span class="tabular">{fmtPct((w ?? 0) * 100, 0)}</span></li>
         {/each}
       </ul>
-    {:else}
+    {/if}
+  </aside>
+
+  <aside class="card guide">
     <div class="card-head"><h3>{t('portAccountProfile')}</h3></div>
     <ProfileSelector />
 
@@ -483,20 +521,6 @@
       {t('portAccountSettingsHint')}
       <a href="/settings">{t('navSettings')}</a>
     </p>
-
-    <div class="card-head" style="margin-top:var(--space-6)"><h3>{t('portAnalytics')}</h3></div>
-    <div class="analytics">
-      <div class="an-row"><span>{t('kpiBuyingPower')}</span><span class="tabular">{fmtMoney(analytics.buyingPower)}</span></div>
-      <div class="an-row"><span>{t('portMaintCoverage')}</span><span class="tabular">{fmtNum(analytics.maintenanceCoverage)}×</span></div>
-      <div class="an-row"><span>{t('portMarginUsage')}</span><span class="tabular" class:neg={analytics.marginUtilization > 0.8}>{fmtPct(analytics.marginUtilization * 100, 0)}</span></div>
-      <div class="an-row"><span>{t('metricConcentration')}</span><span class="tabular">{analytics.concentrationRisk.flag ? '⚠ ' : ''}{fmtPct(analytics.concentrationRisk.current * 100, 0)} · {analytics.concentrationRisk.maxPosition}</span></div>
-    </div>
-    <p class="an-note">{t('portSectorExposure')}</p>
-    <ul class="an-sectors">
-      {#each Object.entries(analytics.sectorExposure) as [sector, w] (sector)}
-        <li><span>{sectorLabel(sector)}</span><span class="tabular">{fmtPct((w ?? 0) * 100, 0)}</span></li>
-      {/each}
-    </ul>
 
     <div class="card-head" style="margin-top:var(--space-6)"><h3>{t('navWatchlist')}</h3></div>
     <p class="wl-note">{t('portWatchlistNote')}</p>
@@ -526,7 +550,6 @@
         <li><button onclick={() => openConcept(c.key)}><Icon name="info" size={16} /> {conceptTitle(c.key)}</button></li>
       {/each}
     </ul>
-    {/if}
   </aside>
 </div>
 
@@ -552,13 +575,59 @@
   }
   .grid {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: minmax(0, 1fr) 280px 280px;
     gap: var(--space-6);
     align-items: start;
+    max-width: 1400px;
+    margin: 0 auto;
   }
   .grid.single-column {
-    grid-template-columns: minmax(0, 760px);
-    justify-content: center;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (max-width: 1280px) {
+    .grid:not(.single-column) { grid-template-columns: minmax(0, 1fr) 320px; }
+    .grid:not(.single-column) > .stats-panel { display: none; }
+  }
+  @media (max-width: 960px) {
+    .grid { grid-template-columns: minmax(0, 1fr) !important; }
+    .grid > .stats-panel, .grid > .guide { display: none; }
+  }
+
+  .stats-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .sector-pills {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sector-pill {
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 10px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: border-color 120ms ease;
+  }
+  .sector-pill:hover { border-color: var(--text); }
+  .sector-pill strong { font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .sector-pill-company {
+    color: var(--muted);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .card {
     background: var(--surface);
