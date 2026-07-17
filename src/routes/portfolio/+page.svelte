@@ -302,6 +302,8 @@
   {#if app.portfolio.holdings.length > 0}
   <section class="card table-card">
     <div class="card-head">
+      <h3>{t('portPositions', { count: app.portfolio.holdings.length })}</h3>
+    </div>
     <div class="coll-breakdown">
       <div class="cb-item">
         <span class="cb-k">{t('simCashCollateral')}</span>
@@ -584,9 +586,9 @@
   .grid.single-column {
     grid-template-columns: minmax(0, 1fr);
   }
-  @media (max-width: 1280px) {
-    .grid:not(.single-column) { grid-template-columns: minmax(0, 1fr) 320px; }
-    .grid:not(.single-column) > .stats-panel { display: none; }
+  @media (max-width: 1440px) {
+    .grid { grid-template-columns: minmax(0, 1fr) 320px; }
+    .grid > .stats-panel { display: none; }
   }
   @media (max-width: 960px) {
     .grid { grid-template-columns: minmax(0, 1fr) !important; }
