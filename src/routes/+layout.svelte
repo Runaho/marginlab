@@ -101,6 +101,7 @@
   .main {
     min-width: 0;
     padding-block: var(--space-8);
+    padding-inline: clamp(12px, 2vw, 24px);
   }
   .footer {
     display: flex;

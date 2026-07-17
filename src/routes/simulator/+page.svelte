@@ -680,4 +680,12 @@
   @media (max-width: 960px) {
     .sim { grid-template-columns: 1fr; }
   }
+  @media (max-width: 540px) {
+    .res-grid { grid-template-columns: 1fr !important; }
+    .form-grid { grid-template-columns: 1fr !important; }
+    .hdr-grid { grid-template-columns: 1fr; }
+    .trade { flex-direction: column; align-items: stretch; }
+    .inputs select, .inputs input { width: 100%; max-width: 100%; }
+    .inputs { padding: var(--space-4); }
+  }
 </style>

@@ -134,6 +134,14 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Yatay kaydırma koruması: hiçbir sayfa viewport'u taşmasın.
+   Mobilde layout kaynaklı overflow'u gizle, içeride scroll gerekirse
+   .table-scroll gibi özel wrapper'lar kullanılsın. */
+html,
+body {
+  overflow-x: clip;
+}
+
 h1,
 h2,
 h3,
