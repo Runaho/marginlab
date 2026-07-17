@@ -33,3 +33,6 @@ Thumbs.db
 
 # Inlang cache (auto-generated)
 project.inlang/cache/
+
+# Hermes plans (kept in ~/.hermes/plans/, not in repo)
+.hermes/
