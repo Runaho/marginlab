@@ -20,6 +20,9 @@
   import CollateralBadge from '$lib/components/ui/CollateralBadge.svelte';
   import ProfileSelector from '$lib/components/ui/ProfileSelector.svelte';
   import Icon from '$lib/components/icons/Icon.svelte';
+  import Modal from '$lib/components/ui/Modal.svelte';
+  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
 
   const stats = $derived(
     selectAccount({
@@ -144,6 +147,34 @@
     newH.sector = sectorFor(m.category);
   }
 
+  // Onboarding modal for first-time visitors
+  let showOnboarding = $state(false);
+
+  onMount(() => {
+    if (!browser) return;
+    const onboarded = localStorage.getItem('mc-onboarded');
+    if (!onboarded) {
+      showOnboarding = true;
+    }
+  });
+
+  function completeOnboarding(loadDemo: boolean) {
+    if (loadDemo) {
+      loadPortfolio(structuredClone(DEFAULT_PORTFOLIO));
+    }
+    if (browser) {
+      localStorage.setItem('mc-onboarded', 'true');
+    }
+    showOnboarding = false;
+  }
+
+  function clearAll() {
+    const ok = confirm(t('portClearConfirm'));
+    if (ok) {
+      loadPortfolio(structuredClone({ cash: 0, account: app.portfolio.account, holdings: [] }));
+    }
+  }
+
   const concepts = [
     { key: 'collateral' },
     { key: 'concentration' },
@@ -154,6 +185,22 @@
 
 <PageHeader eyebrow={t('navWorkspace')} title={t('navPortfolio')} desc={t('portDesc')} />
 
+<!-- Onboarding Modal -->
+<Modal open={showOnboarding} title={t('portOnboardTitle')} eyebrow="Hoş geldin" onclose={() => completeOnboarding(false)} wide>
+  <div class="onboard">
+    <p class="onboard-desc">{t('portOnboardDesc')}</p>
+    <div class="onboard-actions">
+      <Button variant="secondary" icon="download" onclick={() => completeOnboarding(false)}>
+        {t('portOnboardEmpty')}
+      </Button>
+      <Button icon="sparkles" onclick={() => completeOnboarding(true)}>
+        {t('portOnboardDemo')}
+      </Button>
+    </div>
+    <p class="onboard-note">{t('portOnboardEmptyDesc')}</p>
+  </div>
+</Modal>
+
 <GuidedNote title={t('portCollateralGuideTitle')}>
   {t('portCollateralGuideBody')}
 </GuidedNote>
@@ -162,18 +209,23 @@
   <Button icon="upload" variant="secondary" onclick={() => fileInput.click()}>{t('portLoadJson')}</Button>
   <input bind:this={fileInput} type="file" accept="application/json,.json" onchange={onFile} hidden />
   <Button icon="download" variant="secondary" onclick={() => downloadPortfolio(app.portfolio)}>{t('portExportJson')}</Button>
-  <a class="reset" href="/portfolio" onclick={() => loadPortfolio(structuredClone({ cash: 45.16, account: app.portfolio.account, holdings: [] }))}>{t('commonClear')}</a>
+  <Button variant="ghost" icon="trash" onclick={clearAll} class="clear-btn">{t('portClearTitle')}</Button>
 </div>
 {#if fileError}<div class="err">{fileError}</div>{/if}
 
 <div class="grid">
   {#if app.portfolio.holdings.length === 0}
     <section class="card empty">
-      <h3>{t('portEmptyTitle')}</h3>
-      <p>{t('portEmptyBody')}</p>
+      <GuidedNote title={t('portEmptyTitle')}>
+        {t('portEmptyBody')}
+      </GuidedNote>
       <div class="empty-actions">
-        <Button icon="download" onclick={() => loadPortfolio(structuredClone(DEFAULT_PORTFOLIO))}>{t('portLoadDemo')}</Button>
-        <Button variant="secondary" icon="upload" onclick={() => fileInput.click()}>{t('portLoadJson')}</Button>
+        <Button icon="plus" onclick={() => { /* focus add position */ }}>
+          {t('portEmptyCta')}
+        </Button>
+        <Button variant="secondary" icon="download" onclick={() => loadPortfolio(structuredClone(DEFAULT_PORTFOLIO))}>
+          {t('portEmptyDemo')}
+        </Button>
       </div>
     </section>
   {/if}
@@ -947,7 +999,34 @@
       justify-content: flex-end;
     }
     .form {
-      grid-template-columns: 1fr;
+        grid-template-columns: 1fr;
+      }
     }
+
+  .onboard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    align-items: stretch;
+  }
+  .onboard-desc {
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+  .onboard-actions {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .onboard-note {
+    font-size: 13px;
+    color: var(--faint);
+    text-align: center;
+    margin: 0;
+  }
+  .clear-btn {
+    margin-left: auto;
   }
 </style>
