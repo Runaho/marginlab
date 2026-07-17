@@ -2,9 +2,12 @@ import type { DecisionRecord, FinderConfig, Holding, PortfolioData, UserScenario
 import type { BrokerProfileId } from '../engine/marginProfile';
 import { DEFAULT_PROFILE_ID } from '../engine/marginProfile';
 import { DEFAULT_PORTFOLIO } from '../engine/presets';
+import { DEFAULT_COLLATERAL_RATE } from '../engine/marginProfile';
+import type { AccountParams } from '../engine/types';
+import { DEFAULT_ACCOUNT } from '../engine/config';
 
 export const APP_STATE_KEY = 'mc-app-state';
-export const APP_STATE_VERSION = 2;
+export const APP_STATE_VERSION = 3;
 
 /**
  * Working draft: kullanıcının üzerinde çalıştığı trade taslağı.
@@ -37,9 +40,14 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function cloneSeed(): AppStateShape {
+/** Boş portföy seed — kullanıcı kendi hisselerini girer. */
+function cloneEmptyPortfolio(): AppStateShape {
   return {
-    p: JSON.parse(JSON.stringify(DEFAULT_PORTFOLIO)) as PortfolioData,
+    p: {
+      cash: 0,
+      account: { ...DEFAULT_ACCOUNT },
+      holdings: []
+    } as PortfolioData,
     s: 'Peak',
     f: { budget: 300, riskTolerance: 'medium', goal: 'fit', mode: 'balanced', scope: 'selected', maxLot: 5 },
     g: true,
@@ -51,6 +59,13 @@ function cloneSeed(): AppStateShape {
     cs: [],
     ac: null
   };
+}
+
+/** Eski seed (DEFAULT_PORTFOLIO) — sadece demo yüklemek için export edilir. */
+export { DEFAULT_PORTFOLIO } from '../engine/presets';
+
+function cloneSeed(): AppStateShape {
+  return cloneEmptyPortfolio();
 }
 
 /** UserScenario element validation — bozuk kayıtları sessizce atar. */

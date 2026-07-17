@@ -20,6 +20,9 @@
   import CollateralBadge from '$lib/components/ui/CollateralBadge.svelte';
   import ProfileSelector from '$lib/components/ui/ProfileSelector.svelte';
   import Icon from '$lib/components/icons/Icon.svelte';
+  import Modal from '$lib/components/ui/Modal.svelte';
+  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
 
   const stats = $derived(
     selectAccount({
@@ -144,6 +147,43 @@
     newH.sector = sectorFor(m.category);
   }
 
+  /** Sector explorer (empty state) ile quick-add formu arasinda kopru */
+  let pickSector = $state<string>('');
+  function prefillFromMarket(ticker: string) {
+    pickMarketTicker(ticker);
+    // Formu gorunur kalmaya zorla (details.add.quick zaten open)
+  }
+
+  // Onboarding modal for first-time visitors
+  let showOnboarding = $state(false);
+
+  onMount(() => {
+    if (!browser) return;
+    const onboarded = localStorage.getItem('mc-onboarded');
+    if (!onboarded) {
+      showOnboarding = true;
+    }
+  });
+
+  function completeOnboarding(loadDemo: boolean) {
+    if (loadDemo) {
+      loadPortfolio(structuredClone(DEFAULT_PORTFOLIO));
+    }
+    if (browser) {
+      localStorage.setItem('mc-onboarded', 'true');
+    }
+    showOnboarding = false;
+  }
+
+  function clearAll() {
+    const ok = confirm(t('portClearConfirm'));
+    if (ok) {
+      // app.portfolio.account Svelte 5 proxy; structuredClone burada patlar (DataCloneError).
+      // loadPortfolio zaten JSON ile deep-clone yapıyor — plain object geçirmek yeterli.
+      loadPortfolio({ cash: 0, account: { ...app.portfolio.account }, holdings: [] });
+    }
+  }
+
   const concepts = [
     { key: 'collateral' },
     { key: 'concentration' },
@@ -154,6 +194,22 @@
 
 <PageHeader eyebrow={t('navWorkspace')} title={t('navPortfolio')} desc={t('portDesc')} />
 
+<!-- Onboarding Modal -->
+<Modal open={showOnboarding} title={t('portOnboardTitle')} eyebrow="Hoş geldin" onclose={() => completeOnboarding(false)} wide>
+  <div class="onboard">
+    <p class="onboard-desc">{t('portOnboardDesc')}</p>
+    <div class="onboard-actions">
+      <Button variant="secondary" icon="download" onclick={() => completeOnboarding(false)}>
+        {t('portOnboardEmpty')}
+      </Button>
+      <Button icon="sparkles" onclick={() => completeOnboarding(true)}>
+        {t('portOnboardDemo')}
+      </Button>
+    </div>
+    <p class="onboard-note">{t('portOnboardEmptyDesc')}</p>
+  </div>
+</Modal>
+
 <GuidedNote title={t('portCollateralGuideTitle')}>
   {t('portCollateralGuideBody')}
 </GuidedNote>
@@ -162,21 +218,88 @@
   <Button icon="upload" variant="secondary" onclick={() => fileInput.click()}>{t('portLoadJson')}</Button>
   <input bind:this={fileInput} type="file" accept="application/json,.json" onchange={onFile} hidden />
   <Button icon="download" variant="secondary" onclick={() => downloadPortfolio(app.portfolio)}>{t('portExportJson')}</Button>
-  <a class="reset" href="/portfolio" onclick={() => loadPortfolio(structuredClone({ cash: 45.16, account: app.portfolio.account, holdings: [] }))}>{t('commonClear')}</a>
+  <Button variant="ghost" icon="trash" onclick={clearAll} class="clear-btn">{t('portClearTitle')}</Button>
 </div>
 {#if fileError}<div class="err">{fileError}</div>{/if}
 
 <div class="grid">
   {#if app.portfolio.holdings.length === 0}
-    <section class="card empty">
-      <h3>{t('portEmptyTitle')}</h3>
-      <p>{t('portEmptyBody')}</p>
-      <div class="empty-actions">
-        <Button icon="download" onclick={() => loadPortfolio(structuredClone(DEFAULT_PORTFOLIO))}>{t('portLoadDemo')}</Button>
-        <Button variant="secondary" icon="upload" onclick={() => fileInput.click()}>{t('portLoadJson')}</Button>
+    <section class="card empty-rich">
+      <!-- Empty workspace — bigger, asymmetric-healing, mimics table-card density -->
+      <div class="empty-rich-head">
+        <div class="empty-rich-icon"><Icon name="briefcase" size={28} /></div>
+        <div>
+          <h2>{t('portEmptyTitle')}</h2>
+          <p class="empty-rich-sub">{t('portEmptyRichSub')}</p>
+        </div>
       </div>
+
+      <ol class="empty-steps">
+        <li>
+          <span class="step-num">1</span>
+          <div>
+            <strong>{t('portEmptyStep1Title')}</strong>
+            <p>{t('portEmptyStep1Body')}</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <div>
+            <strong>{t('portEmptyStep2Title')}</strong>
+            <p>{t('portEmptyStep2Body')}</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <div>
+            <strong>{t('portEmptyStep3Title')}</strong>
+            <p>{t('portEmptyStep3Body')}</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="empty-rich-cta">
+        <details class="add quick" open>
+          <summary><Icon name="plus" size={16} /> {t('portQuickAdd')}</summary>
+          <div class="form">
+            <p class="auto-pool-note">{t('portAutoPoolNote')}</p>
+            <div class="form-section">
+              <div class="form-grid">
+                <label>{t('lblTicker')}
+                  <select value={newH.ticker} onchange={(e) => pickMarketTicker((e.currentTarget as HTMLSelectElement).value)}>
+                    <option value="">{t('commonSelect')}</option>
+                    {#each MARKET as m}<option value={m.ticker}>{m.ticker} — {m.company}</option>{/each}
+                  </select>
+                </label>
+                <label>{t('lblShares')}<input type="number" min="1" bind:value={newH.shares} /></label>
+                <label>{t('lblPrice')}<input type="number" min="0" step="0.01" bind:value={newH.price} /></label>
+              </div>
+            </div>
+            <div class="form-actions">
+              <Button icon="plus" onclick={addPos}>{t('commonAdd')}</Button>
+              <Button variant="secondary" icon="download" onclick={() => loadPortfolio(structuredClone(DEFAULT_PORTFOLIO))}>{t('portEmptyDemo')}</Button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <details class="add advanced">
+        <summary><Icon name="sliders" size={14} /> {t('portAdvancedFields')}</summary>
+        <div class="form-grid">
+          <label>{t('lblName')}<input bind:value={newH.name} placeholder={t('portFormNamePlaceholder')} /></label>
+          <label>{t('lblCost')}<input type="number" min="0" step="0.01" bind:value={newH.cost} /></label>
+          <label>{t('lblBeta')}<input type="number" step="0.1" bind:value={newH.beta} /></label>
+          <label>{t('lblCollateralPct')}<input type="number" min="0" max="100" step="1" value={Math.round((newH.collateral ?? 0) * 100)} oninput={(e) => newH.collateral = (parseFloat((e.currentTarget as HTMLInputElement).value) || 0) / 100} /></label>
+          <label>{t('lblSector')}
+            <select bind:value={newH.sector}>
+              {#each SECTORS as s}<option value={s}>{sectorLabel(s)}</option>{/each}
+            </select>
+          </label>
+        </div>
+      </details>
     </section>
   {/if}
+  {#if app.portfolio.holdings.length > 0}
   <section class="card table-card">
     <div class="card-head">
       <h3>{t('portPositions', { count: app.portfolio.holdings.length })}</h3>
@@ -198,6 +321,7 @@
       </div>
       <span class="cb-profile">{profileLabel(profile.id)}</span>
     </div>
+
     {#if profile.collateralMode === 'cash-only'}
       <p class="adv-note">
         {t('portAdvNoSec', { profile: profileLabel(profile.id) })}
@@ -339,6 +463,53 @@
       </div>
     </details>
   </section>
+  {/if}
+
+  <aside class="card stats-panel">
+    {#if app.portfolio.holdings.length === 0}
+      <!-- Empty mode: sector explorer -->
+      <div class="card-head"><h3>{t('portSectorExplorerTitle')}</h3></div>
+      <p class="acct-hint">{t('portSectorExplorerSub')}</p>
+      <label class="acct" style="margin-top:var(--space-3)">{t('portPickSector')}
+        <select bind:value={pickSector}>
+          <option value="">{t('commonSelect')}</option>
+          {#each SECTORS as s}
+            <option value={s}>{sectorLabel(s)}</option>
+          {/each}
+        </select>
+      </label>
+      {#if pickSector}
+        {@const sectorStocks = MARKET.filter((m) => sectorFor(m.category) === pickSector).slice(0, 5)}
+        <p class="an-note" style="margin-top:var(--space-4)">{t('portPopularIn')} {sectorLabel(pickSector)}</p>
+        <ul class="sector-pills">
+          {#each sectorStocks as m (m.ticker)}
+            <li>
+              <button type="button" class="sector-pill" onclick={() => prefillFromMarket(m.ticker)}>
+                <strong>{m.ticker}</strong>
+                <span class="sector-pill-company">{m.company}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+        <p class="acct-hint" style="margin-top:var(--space-3)">{t('portTipAdd')}</p>
+      {/if}
+    {:else}
+      <!-- Live mode: portfolio stats -->
+      <div class="card-head"><h3>{t('portAnalytics')}</h3></div>
+      <div class="analytics">
+        <div class="an-row"><span>{t('kpiBuyingPower')}</span><span class="tabular">{fmtMoney(analytics.buyingPower)}</span></div>
+        <div class="an-row"><span>{t('portMaintCoverage')}</span><span class="tabular">{fmtNum(analytics.maintenanceCoverage)}×</span></div>
+        <div class="an-row"><span>{t('portMarginUsage')}</span><span class="tabular" class:neg={analytics.marginUtilization > 0.8}>{fmtPct(analytics.marginUtilization * 100, 0)}</span></div>
+        <div class="an-row"><span>{t('metricConcentration')}</span><span class="tabular">{analytics.concentrationRisk.flag ? '⚠ ' : ''}{fmtPct(analytics.concentrationRisk.current * 100, 0)} · {analytics.concentrationRisk.maxPosition}</span></div>
+      </div>
+      <p class="an-note">{t('portSectorExposure')}</p>
+      <ul class="an-sectors">
+        {#each Object.entries(analytics.sectorExposure) as [sector, w] (sector)}
+          <li><span>{sectorLabel(sector)}</span><span class="tabular">{fmtPct((w ?? 0) * 100, 0)}</span></li>
+        {/each}
+      </ul>
+    {/if}
+  </aside>
 
   <aside class="card guide">
     <div class="card-head"><h3>{t('portAccountProfile')}</h3></div>
@@ -352,20 +523,6 @@
       {t('portAccountSettingsHint')}
       <a href="/settings">{t('navSettings')}</a>
     </p>
-
-    <div class="card-head" style="margin-top:var(--space-6)"><h3>{t('portAnalytics')}</h3></div>
-    <div class="analytics">
-      <div class="an-row"><span>{t('kpiBuyingPower')}</span><span class="tabular">{fmtMoney(analytics.buyingPower)}</span></div>
-      <div class="an-row"><span>{t('portMaintCoverage')}</span><span class="tabular">{fmtNum(analytics.maintenanceCoverage)}×</span></div>
-      <div class="an-row"><span>{t('portMarginUsage')}</span><span class="tabular" class:neg={analytics.marginUtilization > 0.8}>{fmtPct(analytics.marginUtilization * 100, 0)}</span></div>
-      <div class="an-row"><span>{t('metricConcentration')}</span><span class="tabular">{analytics.concentrationRisk.flag ? '⚠ ' : ''}{fmtPct(analytics.concentrationRisk.current * 100, 0)} · {analytics.concentrationRisk.maxPosition}</span></div>
-    </div>
-    <p class="an-note">{t('portSectorExposure')}</p>
-    <ul class="an-sectors">
-      {#each Object.entries(analytics.sectorExposure) as [sector, w] (sector)}
-        <li><span>{sectorLabel(sector)}</span><span class="tabular">{fmtPct((w ?? 0) * 100, 0)}</span></li>
-      {/each}
-    </ul>
 
     <div class="card-head" style="margin-top:var(--space-6)"><h3>{t('navWatchlist')}</h3></div>
     <p class="wl-note">{t('portWatchlistNote')}</p>
@@ -420,9 +577,59 @@
   }
   .grid {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: minmax(0, 1fr) 280px 280px;
     gap: var(--space-6);
     align-items: start;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .grid.single-column {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (max-width: 1440px) {
+    .grid { grid-template-columns: minmax(0, 1fr) 320px; }
+    .grid > .stats-panel { display: none; }
+  }
+  @media (max-width: 960px) {
+    .grid { grid-template-columns: minmax(0, 1fr) !important; }
+    .grid > .stats-panel, .grid > .guide { display: none; }
+  }
+
+  .stats-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .sector-pills {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sector-pill {
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 10px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: border-color 120ms ease;
+  }
+  .sector-pill:hover { border-color: var(--text); }
+  .sector-pill strong { font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .sector-pill-company {
+    color: var(--muted);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .card {
     background: var(--surface);
@@ -747,6 +954,112 @@
     flex-wrap: wrap;
     margin-top: var(--space-2);
   }
+
+  /* Empty-state-as-workspace: yatay asimetriyi iyilestiren zengin kart */
+  .empty-rich {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface) 92%, transparent) 0%,
+      var(--surface) 60%
+    );
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-7);
+  }
+  .empty-rich-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+  .empty-rich-icon {
+    width: 56px;
+    height: 56px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text);
+    flex-shrink: 0;
+  }
+  .empty-rich-head h2 {
+    font-family: var(--font-display);
+    font-size: 28px;
+    line-height: 1.15;
+    margin: 0 0 var(--space-2);
+  }
+  .empty-rich-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+    max-width: 56ch;
+  }
+  .empty-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+    counter-reset: step;
+  }
+  .empty-steps li {
+    display: flex;
+    gap: var(--space-3);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+  }
+  .step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--text);
+    color: var(--inverse);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .empty-steps strong {
+    font-size: 14px;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .empty-steps p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .empty-rich-cta {
+    border-top: 1px dashed var(--border);
+    padding-top: var(--space-5);
+  }
+  .empty-rich-cta .form-section h4 { display: none; }
+  .empty-rich-cta .form-grid {
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: var(--space-3);
+  }
+  .empty-rich-cta .form-actions {
+    justify-content: flex-start;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+  }
+  .add.advanced {
+    margin-top: var(--space-3);
+    border-top: 1px dashed var(--border);
+    padding-top: var(--space-4);
+  }
+  @media (max-width: 720px) {
+    .empty-steps { grid-template-columns: 1fr; }
+    .empty-rich-cta .form-grid { grid-template-columns: 1fr 1fr; }
+  }
   .acct {
     display: flex;
     flex-direction: column;
@@ -947,7 +1260,34 @@
       justify-content: flex-end;
     }
     .form {
-      grid-template-columns: 1fr;
+        grid-template-columns: 1fr;
+      }
     }
+
+  .onboard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    align-items: stretch;
+  }
+  .onboard-desc {
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+  .onboard-actions {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .onboard-note {
+    font-size: 13px;
+    color: var(--faint);
+    text-align: center;
+    margin: 0;
+  }
+  .clear-btn {
+    margin-left: auto;
   }
 </style>

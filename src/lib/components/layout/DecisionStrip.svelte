@@ -168,6 +168,8 @@
     border-radius: var(--radius-md);
     padding: var(--space-3) var(--space-4);
     margin-bottom: var(--space-6);
+    overflow: hidden;
+    min-width: 0;
   }
   .cell {
     display: flex;
@@ -185,6 +187,7 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    overflow: hidden;
   }
   .k {
     font-size: 11px;
@@ -193,6 +196,8 @@
     color: var(--faint);
     font-weight: 600;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .v {
     font-size: 16px;
@@ -200,6 +205,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
   }
   .divider {
     width: 1px;
@@ -209,12 +215,20 @@
   @media (max-width: 760px) {
     .strip {
       flex-wrap: wrap;
+      gap: var(--space-2);
+      padding: var(--space-3);
     }
     .cell {
-      flex: 1 1 45%;
+      flex: 1 1 calc(50% - var(--space-2));
+      min-width: 0;
     }
     .divider {
       display: none;
+    }
+  }
+  @media (max-width: 380px) {
+    .cell {
+      flex: 1 1 100%;
     }
   }
 </style>

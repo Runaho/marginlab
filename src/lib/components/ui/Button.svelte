@@ -7,6 +7,7 @@
     icon,
     disabled = false,
     type = 'button',
+    class: className = '',
     children
   }: {
     variant?: 'primary' | 'secondary' | 'ghost';
@@ -14,11 +15,12 @@
     icon?: string;
     disabled?: boolean;
     type?: 'button' | 'submit';
+    class?: string;
     children: import('svelte').Snippet;
   } = $props();
 </script>
 
-<button {type} class="btn btn-{variant}" {onclick} {disabled}>
+<button {type} class="btn btn-{variant} {className}" {onclick} {disabled}>
   {#if icon}<Icon name={icon} size={18} />{/if}
   {@render children()}
 </button>

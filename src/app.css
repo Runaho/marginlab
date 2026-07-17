@@ -72,34 +72,40 @@
 }
 
 [data-theme='dark'] {
-  --bg: #16140f;
-  --surface: #1c1a15;
-  --surface-2: #211e18;
-  --surface-3: #2a261f;
-  --border: #38332b;
+  /* ===== Mint Care palette — cool complementary with mint-tinted base =====
+     Runaho geri bildirimi (v3): surface-3 ve border chroma'lı nötr
+     warm'dı, accent teal ile yarışıyordu ve "uyarı rengi" gibi
+     duruyordu. Oysa bunlar UI chrome — accent ile aynı temperature'da
+     olmalı. Base mint/teal undertone'a kaydırıldı: pure cool gray değil,
+     subtle mint — accent teal ile tek dil, warm chroma sıfır. */
+  --bg: #0f1414;
+  --surface: #161b1c;
+  --surface-2: #1c2122;
+  --surface-3: #22292a;
+  --border: #2d3537;
   --text: #f3efe7;
   --muted: #a59c8f;
   --faint: #90887b;
-  --success: #6fcf86;
-  --warning: #e0a35a;
-  --danger: #e8758a;
-  --inverse: #16140f;
+  --success: #14b8a6;
+  --warning: #fb923c;
+  --danger: #be123c;
+  --inverse: #0f1414;
 
   --neutral-bg: var(--surface-2);
   --neutral-border: var(--border);
   --neutral-fg: var(--muted);
-  --info-bg: #1e2530;
-  --info-border: #3c4a5e;
-  --info-fg: #9db6d6;
-  --positive-bg: #1a2a1e;
-  --positive-border: #33503b;
-  --positive-fg: #7fd08f;
-  --attention-bg: #2b2115;
-  --attention-border: #574021;
-  --attention-fg: #e0a35a;
-  --critical-bg: #2b171c;
-  --critical-border: #573039;
-  --critical-fg: #e8758a;
+  --info-bg: #142028;
+  --info-border: #1f4858;
+  --info-fg: #14b8a6;
+  --positive-bg: #142028;
+  --positive-border: #1f4858;
+  --positive-fg: #14b8a6;
+  --attention-bg: #2a1f15;
+  --attention-border: #5c3a1a;
+  --attention-fg: #fb923c;
+  --critical-bg: #2a1419;
+  --critical-border: #5c2330;
+  --critical-fg: #be123c;
 }
 
 @theme inline {
@@ -132,6 +138,14 @@ body {
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Yatay kaydırma koruması: hiçbir sayfa viewport'u taşmasın.
+   Mobilde layout kaynaklı overflow'u gizle, içeride scroll gerekirse
+   .table-scroll gibi özel wrapper'lar kullanılsın. */
+html,
+body {
+  overflow-x: clip;
 }
 
 h1,

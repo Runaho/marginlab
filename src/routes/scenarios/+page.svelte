@@ -39,6 +39,17 @@
   const tickerOptions = $derived(groupedTickerOptions(app.portfolio.holdings, app.watchlist));
   const tickerGroups = $derived(groupedTickerGroups(app.portfolio.holdings, app.watchlist));
 
+  // Mobile responsive label: see simulator/+page.svelte for rationale
+  let isMobile = $state(false);
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 540px)');
+    isMobile = mq.matches;
+    const handler = (e: MediaQueryListEvent) => (isMobile = e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  });
+
   const price = $derived(getInstrument(ticker)?.price ?? 0);
 
   const tradeSpec = $derived.by(() => {
@@ -292,7 +303,7 @@
     {#each tickerGroups as g (g.key)}
       <optgroup label={g.label}>
         {#each g.options as opt (opt.ticker)}
-          <option value={opt.ticker}>{opt.ticker} — {opt.name}{opt.group === 'portfolio' && opt.shares ? t('simOwnedNote', { shares: opt.shares, weight: ((opt.weight ?? 0) * 100).toFixed(0) }) : ''}{opt.group === 'watchlist' ? ` · ${t('navWatchlist')}` : ''}</option>
+          <option value={opt.ticker}>{isMobile ? opt.ticker : `${opt.ticker} — ${opt.name}${opt.group === 'portfolio' && opt.shares ? t('simOwnedNote', { shares: opt.shares, weight: ((opt.weight ?? 0) * 100).toFixed(0) }) : ''}${opt.group === 'watchlist' ? ` · ${t('navWatchlist')}` : ''}`}</option>
         {/each}
       </optgroup>
     {/each}

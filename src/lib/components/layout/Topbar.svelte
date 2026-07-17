@@ -43,15 +43,20 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 var(--space-6);
+    gap: var(--space-3);
+    padding: 0 var(--space-4);
     background: color-mix(in srgb, var(--bg) 80%, transparent);
     backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--border);
+    overflow: hidden;
   }
   .left {
     display: flex;
     align-items: center;
     gap: var(--space-3);
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
   }
   .menu {
     display: none;
@@ -117,6 +122,24 @@
   @media (max-width: 1180px) {
     .menu {
       display: grid;
+    }
+  }
+  @media (max-width: 540px) {
+    .topbar {
+      padding: 0 var(--space-3);
+      gap: var(--space-2);
+    }
+    .brand-text {
+      min-width: 0;
+      overflow: hidden;
+    }
+    .brand-text .sub {
+      display: none;
+    }
+    .mark {
+      width: 32px;
+      height: 32px;
+      font-size: 18px;
     }
   }
 </style>
