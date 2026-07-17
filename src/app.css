@@ -72,23 +72,24 @@
 }
 
 [data-theme='dark'] {
-  /* ===== Mint Care palette — cool complementary on warm-brown canvas =====
-     Runaho geri bildirimi (v2): warm brown bg/surface/border'lar soğuk
-     teal accent ile yarışıyordu. Base chroma azaltıldı: hâlâ warm undertone
-     ama daha muted — accent'ler (teal/amber/rose) ile tek temperature'da
-     birleşsin. Border ve surface-3 artık sıcak değil "neutral warm". */
-  --bg: #131210;
-  --surface: #1a1817;
-  --surface-2: #201d1c;
-  --surface-3: #272321;
-  --border: #332f2c;
+  /* ===== Mint Care palette — cool complementary with mint-tinted base =====
+     Runaho geri bildirimi (v3): surface-3 ve border chroma'lı nötr
+     warm'dı, accent teal ile yarışıyordu ve "uyarı rengi" gibi
+     duruyordu. Oysa bunlar UI chrome — accent ile aynı temperature'da
+     olmalı. Base mint/teal undertone'a kaydırıldı: pure cool gray değil,
+     subtle mint — accent teal ile tek dil, warm chroma sıfır. */
+  --bg: #0f1414;
+  --surface: #161b1c;
+  --surface-2: #1c2122;
+  --surface-3: #22292a;
+  --border: #2d3537;
   --text: #f3efe7;
   --muted: #a59c8f;
   --faint: #90887b;
   --success: #14b8a6;
   --warning: #fb923c;
   --danger: #be123c;
-  --inverse: #131210;
+  --inverse: #0f1414;
 
   --neutral-bg: var(--surface-2);
   --neutral-border: var(--border);
