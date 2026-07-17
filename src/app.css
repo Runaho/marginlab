@@ -72,22 +72,23 @@
 }
 
 [data-theme='dark'] {
-  /* ===== Mint Care palette — cool complementary on warm-brown canvas ===== */
-  /* Warm-brown editorial base korunur (marginlab ruhu), accent + status
-     renkleri teal/orange/rose paletine taşınır. Tek accent prensibi:
-     accent ve success = teal #14b8a6. */
-  --bg: #16140f;
-  --surface: #1c1a15;
-  --surface-2: #211e18;
-  --surface-3: #2a261f;
-  --border: #38332b;
+  /* ===== Mint Care palette — cool complementary on warm-brown canvas =====
+     Runaho geri bildirimi (v2): warm brown bg/surface/border'lar soğuk
+     teal accent ile yarışıyordu. Base chroma azaltıldı: hâlâ warm undertone
+     ama daha muted — accent'ler (teal/amber/rose) ile tek temperature'da
+     birleşsin. Border ve surface-3 artık sıcak değil "neutral warm". */
+  --bg: #131210;
+  --surface: #1a1817;
+  --surface-2: #201d1c;
+  --surface-3: #272321;
+  --border: #332f2c;
   --text: #f3efe7;
   --muted: #a59c8f;
   --faint: #90887b;
   --success: #14b8a6;
   --warning: #fb923c;
   --danger: #be123c;
-  --inverse: #16140f;
+  --inverse: #131210;
 
   --neutral-bg: var(--surface-2);
   --neutral-border: var(--border);
