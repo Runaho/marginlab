@@ -215,23 +215,89 @@
 </div>
 {#if fileError}<div class="err">{fileError}</div>{/if}
 
-<div class="grid">
+<div class="grid" class:single-column={app.portfolio.holdings.length === 0}>
   {#if app.portfolio.holdings.length === 0}
-    <section class="card empty">
-      <GuidedNote title={t('portEmptyTitle')}>
-        {t('portEmptyBody')}
-      </GuidedNote>
-      <div class="empty-actions">
-        <Button icon="plus" onclick={() => { /* focus add position */ }}>
-          {t('portEmptyCta')}
-        </Button>
-        <Button variant="secondary" icon="download" onclick={() => loadPortfolio(structuredClone(DEFAULT_PORTFOLIO))}>
-          {t('portEmptyDemo')}
-        </Button>
+    <section class="card empty-rich">
+      <!-- Empty workspace — bigger, asymmetric-healing, mimics table-card density -->
+      <div class="empty-rich-head">
+        <div class="empty-rich-icon"><Icon name="briefcase" size={28} /></div>
+        <div>
+          <h2>{t('portEmptyTitle')}</h2>
+          <p class="empty-rich-sub">{t('portEmptyRichSub')}</p>
+        </div>
       </div>
+
+      <ol class="empty-steps">
+        <li>
+          <span class="step-num">1</span>
+          <div>
+            <strong>{t('portEmptyStep1Title')}</strong>
+            <p>{t('portEmptyStep1Body')}</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <div>
+            <strong>{t('portEmptyStep2Title')}</strong>
+            <p>{t('portEmptyStep2Body')}</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <div>
+            <strong>{t('portEmptyStep3Title')}</strong>
+            <p>{t('portEmptyStep3Body')}</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="empty-rich-cta">
+        <details class="add quick" open>
+          <summary><Icon name="plus" size={16} /> {t('portQuickAdd')}</summary>
+          <div class="form">
+            <p class="auto-pool-note">{t('portAutoPoolNote')}</p>
+            <div class="form-section">
+              <div class="form-grid">
+                <label>{t('lblTicker')}
+                  <select value={newH.ticker} onchange={(e) => pickMarketTicker((e.currentTarget as HTMLSelectElement).value)}>
+                    <option value="">{t('commonSelect')}</option>
+                    {#each MARKET as m}<option value={m.ticker}>{m.ticker} — {m.company}</option>{/each}
+                  </select>
+                </label>
+                <label>{t('lblShares')}<input type="number" min="1" bind:value={newH.shares} /></label>
+                <label>{t('lblPrice')}<input type="number" min="0" step="0.01" bind:value={newH.price} /></label>
+              </div>
+            </div>
+            <div class="form-actions">
+              <Button icon="plus" onclick={addPos}>{t('commonAdd')}</Button>
+              <Button variant="secondary" icon="download" onclick={() => loadPortfolio(structuredClone(DEFAULT_PORTFOLIO))}>{t('portEmptyDemo')}</Button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <details class="add advanced">
+        <summary><Icon name="sliders" size={14} /> {t('portAdvancedFields')}</summary>
+        <div class="form-grid">
+          <label>{t('lblName')}<input bind:value={newH.name} placeholder={t('portFormNamePlaceholder')} /></label>
+          <label>{t('lblCost')}<input type="number" min="0" step="0.01" bind:value={newH.cost} /></label>
+          <label>{t('lblBeta')}<input type="number" step="0.1" bind:value={newH.beta} /></label>
+          <label>{t('lblCollateralPct')}<input type="number" min="0" max="100" step="1" value={Math.round((newH.collateral ?? 0) * 100)} oninput={(e) => newH.collateral = (parseFloat((e.currentTarget as HTMLInputElement).value) || 0) / 100} /></label>
+          <label>{t('lblSector')}
+            <select bind:value={newH.sector}>
+              {#each SECTORS as s}<option value={s}>{sectorLabel(s)}</option>{/each}
+            </select>
+          </label>
+        </div>
+      </details>
     </section>
   {/if}
   <section class="card table-card">
+    {#if app.portfolio.holdings.length === 0}
+      <!-- Empty mode: collapsed card, only advanced note for awareness -->
+      <div class="card-head"><h3>{t('navSettings')}</h3></div>
+      <p class="adv-note">{t('portAdvNote')}</p>
+    {:else}
     <div class="card-head">
       <h3>{t('portPositions', { count: app.portfolio.holdings.length })}</h3>
     </div>
@@ -252,6 +318,7 @@
       </div>
       <span class="cb-profile">{profileLabel(profile.id)}</span>
     </div>
+
     {#if profile.collateralMode === 'cash-only'}
       <p class="adv-note">
         {t('portAdvNoSec', { profile: profileLabel(profile.id) })}
@@ -392,9 +459,19 @@
         </div>
       </div>
     </details>
+    {/if}
   </section>
 
   <aside class="card guide">
+    {#if app.portfolio.holdings.length === 0}
+      <!-- Empty mode: compact guide column -->
+      <div class="card-head"><h3>{t('portConceptGuide')}</h3></div>
+      <ul class="concepts">
+        {#each concepts as c (c.key)}
+          <li><button onclick={() => openConcept(c.key)}><Icon name="info" size={16} /> {conceptTitle(c.key)}</button></li>
+        {/each}
+      </ul>
+    {:else}
     <div class="card-head"><h3>{t('portAccountProfile')}</h3></div>
     <ProfileSelector />
 
@@ -449,6 +526,7 @@
         <li><button onclick={() => openConcept(c.key)}><Icon name="info" size={16} /> {conceptTitle(c.key)}</button></li>
       {/each}
     </ul>
+    {/if}
   </aside>
 </div>
 
@@ -477,6 +555,10 @@
     grid-template-columns: 1fr 320px;
     gap: var(--space-6);
     align-items: start;
+  }
+  .grid.single-column {
+    grid-template-columns: minmax(0, 760px);
+    justify-content: center;
   }
   .card {
     background: var(--surface);
@@ -800,6 +882,112 @@
     gap: var(--space-3);
     flex-wrap: wrap;
     margin-top: var(--space-2);
+  }
+
+  /* Empty-state-as-workspace: yatay asimetriyi iyilestiren zengin kart */
+  .empty-rich {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface) 92%, transparent) 0%,
+      var(--surface) 60%
+    );
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-7);
+  }
+  .empty-rich-head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+  .empty-rich-icon {
+    width: 56px;
+    height: 56px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text);
+    flex-shrink: 0;
+  }
+  .empty-rich-head h2 {
+    font-family: var(--font-display);
+    font-size: 28px;
+    line-height: 1.15;
+    margin: 0 0 var(--space-2);
+  }
+  .empty-rich-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+    max-width: 56ch;
+  }
+  .empty-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+    counter-reset: step;
+  }
+  .empty-steps li {
+    display: flex;
+    gap: var(--space-3);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+  }
+  .step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--text);
+    color: var(--inverse);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .empty-steps strong {
+    font-size: 14px;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .empty-steps p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .empty-rich-cta {
+    border-top: 1px dashed var(--border);
+    padding-top: var(--space-5);
+  }
+  .empty-rich-cta .form-section h4 { display: none; }
+  .empty-rich-cta .form-grid {
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: var(--space-3);
+  }
+  .empty-rich-cta .form-actions {
+    justify-content: flex-start;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+  }
+  .add.advanced {
+    margin-top: var(--space-3);
+    border-top: 1px dashed var(--border);
+    padding-top: var(--space-4);
+  }
+  @media (max-width: 720px) {
+    .empty-steps { grid-template-columns: 1fr; }
+    .empty-rich-cta .form-grid { grid-template-columns: 1fr 1fr; }
   }
   .acct {
     display: flex;
