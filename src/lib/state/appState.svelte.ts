@@ -113,11 +113,15 @@ export function setAccount(patch: Partial<PortfolioData['account']>) {
 }
 
 export function addHolding(h: Holding) {
-  app.portfolio.holdings.push(h);
+  // Svelte 5 $state proxy'si nested array `push`'unu tracking'e dahil etmiyor
+  // ($effect tetiklenmiyor). Replace pattern ile hem reactivity hem persistence garantilenir.
+  app.portfolio.holdings = [...app.portfolio.holdings, h];
 }
 
 export function updateHolding(index: number, patch: Partial<Holding>) {
-  if (app.portfolio.holdings[index]) Object.assign(app.portfolio.holdings[index], patch);
+  app.portfolio.holdings = app.portfolio.holdings.map((h, i) =>
+    i === index ? { ...h, ...patch } : h
+  );
 }
 
 /** Kullanıcı bir pozisyonun teminat oranını override eder → kaynak 'user-override'. */
@@ -145,7 +149,7 @@ export function toggleExcludeCollateral(index: number) {
 }
 
 export function removeHolding(index: number) {
-  app.portfolio.holdings.splice(index, 1);
+  app.portfolio.holdings = app.portfolio.holdings.filter((_, i) => i !== index);
 }
 
 export function setActiveScenario(name: string) {
@@ -208,9 +212,9 @@ export function addDecision(r: DecisionRecord) {
 export function toggleWatchlist(ticker: string) {
   const idx = app.watchlist.findIndex((w) => w.ticker === ticker);
   if (idx >= 0) {
-    app.watchlist.splice(idx, 1);
+    app.watchlist = app.watchlist.filter((_, i) => i !== idx);
   } else {
-    app.watchlist.push({ ticker, addedAt: new Date().toISOString() });
+    app.watchlist = [...app.watchlist, { ticker, addedAt: new Date().toISOString() }];
   }
 }
 

@@ -171,7 +171,9 @@
   function clearAll() {
     const ok = confirm(t('portClearConfirm'));
     if (ok) {
-      loadPortfolio(structuredClone({ cash: 0, account: app.portfolio.account, holdings: [] }));
+      // app.portfolio.account Svelte 5 proxy; structuredClone burada patlar (DataCloneError).
+      // loadPortfolio zaten JSON ile deep-clone yapıyor — plain object geçirmek yeterli.
+      loadPortfolio({ cash: 0, account: { ...app.portfolio.account }, holdings: [] });
     }
   }
 

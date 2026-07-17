@@ -33,8 +33,14 @@
 
   // State değiştikçe localStorage'ı güncelle. URL temiz kalır; paylaşım
   // yalnızca Share butonu üzerinden explicit tetiklenir.
+  // Nested array/object mutasyonları `$state` proxy'lerinde tracking gerektirir:
+  // `void app.portfolio.holdings` derin dependency register eder — yoksa
+  // `push` algılanmaz ve localStorage güncellenmez.
   $effect(() => {
     void app.portfolio;
+    void app.portfolio.cash;
+    void app.portfolio.account;
+    void app.portfolio.holdings;
     void app.activeScenario;
     void app.activeCustomScenarioId;
     void app.finder;
